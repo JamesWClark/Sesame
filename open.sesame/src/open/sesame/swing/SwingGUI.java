@@ -31,6 +31,8 @@ public class SwingGUI {
 	DefaultListModel<String> modelTokens;
 	JList<String> listNames;
 	DefaultListModel<String> modelNames;
+	JList<String> listPOS;
+	DefaultListModel<String> modelPOS;
 	
 	private String[] sentences;
 	private int sentenceIndex = 0;
@@ -63,14 +65,19 @@ public class SwingGUI {
 		JPanel pnlLists = new JPanel(new FlowLayout());
 		listTokens = new JList<String>();
 		listNames = new JList<String>();
+		listPOS = new JList<String>();
 		modelTokens = new DefaultListModel<String>();
 		modelNames = new DefaultListModel<String>();
+		modelPOS = new DefaultListModel<String>();
 		listTokens.setModel(modelTokens);
 		listNames.setModel(modelNames);
+		listPOS.setModel(modelPOS);
 		JScrollPane paneTokens = new JScrollPane(listTokens);
 		JScrollPane paneNames = new JScrollPane(listNames);
+		JScrollPane panePOS = new JScrollPane(listPOS);
 		pnlLists.add(paneTokens);
 		pnlLists.add(paneNames);
+		pnlLists.add(panePOS);
 		
 		Box boxPanel = new Box(BoxLayout.Y_AXIS);
 		boxPanel.add(pnlButtons);
@@ -125,12 +132,15 @@ public class SwingGUI {
 	private void updateView() {
 		modelTokens.removeAllElements();
 		modelNames.removeAllElements();
+		modelPOS.removeAllElements();
 		try {
 			printSentence();
 			String[] tokens = NLPFactory.getTokens(sentences[sentenceIndex], MODELS_DIRECTORY + "en-token.bin");
 			printTokens(tokens);
 			String[] names = NLPFactory.getNames(tokens, MODELS_DIRECTORY + "en-ner-person.bin");
 			printNames(names);
+			String[] tags = NLPFactory.getPOS(tokens, MODELS_DIRECTORY + "en-pos-maxent.bin");
+			printPOS(tags);
 		} catch (IOException ex) {
 			ex.printStackTrace();
 		}
@@ -147,6 +157,11 @@ public class SwingGUI {
 	private void printNames(String[] names) {
 		for(String name : names) {
 			modelNames.addElement(name);
+		}
+	}
+	private void printPOS(String[] tags) {
+		for(String tag : tags) {
+			modelPOS.addElement(tag);
 		}
 	}
 }

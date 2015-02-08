@@ -96,24 +96,26 @@ public class NLPFactory {
 		return names;
 	}
 
-	public static void POSTag(String text, String modelPath) throws IOException {
-		POSModel model = new POSModelLoader().load(new File(modelPath));
-		PerformanceMonitor perfMon = new PerformanceMonitor(System.err, "sent");
+	/**
+	 * uses Penn Treebank tags - https://www.ling.upenn.edu/courses/Fall_2003/ling001/penn_treebank_pos.html
+	 * documentation - http://opennlp.apache.org/documentation/1.5.3/manual/opennlp.html#tools.postagger
+	 * @param tokens
+	 * @param modelPath
+	 * @return
+	 * @throws IOException
+	 */
+	public static String[] getPOS(String[] tokens, String modelPath)
+			throws IOException {
+		InputStream is =  new FileInputStream(modelPath);
+		POSModel model = new POSModel(is);
+		is.close();
 		POSTaggerME tagger = new POSTaggerME(model);
-		ObjectStream<String> lineStream = new PlainTextByLineStream(new StringReader(text));
-		perfMon.start();
-		String line;
-		while ((line = lineStream.read()) != null) {
-			String whitespaceTokenizerLine[] = WhitespaceTokenizer.INSTANCE.tokenize(line);
-			String[] tags = tagger.tag(whitespaceTokenizerLine);
-			POSSample sample = new POSSample(whitespaceTokenizerLine, tags);
-			System.out.println(sample.toString());
-			perfMon.incrementCounter();
-		}
-		perfMon.stopAndPrintFinalResult();
+		String[] tags = tagger.tag(tokens);
+		return tags;
 	}
 	
-	public static void chunk(String text, String modelPOSPath, String modelChunkerPath) throws IOException {
+	public static void chunk(String text, String modelPOSPath, String modelChunkerPath)
+			throws IOException {
 		POSModel model = new POSModelLoader().load(new File(modelPOSPath));
 		PerformanceMonitor perfMon = new PerformanceMonitor(System.err, "sent");
 		POSTaggerME tagger = new POSTaggerME(model);

@@ -47,8 +47,7 @@ public class NLPFactory {
 	 * @throws InvalidFormatException
 	 * @throws IOException
 	 */
-	public static String[] detectSentences(String text, String modelPath)
-			throws InvalidFormatException, IOException {
+	public static String[] getSentences(String text, String modelPath) throws InvalidFormatException, IOException {
 		InputStream is = new FileInputStream(modelPath);
 		SentenceModel model = new SentenceModel(is);
 		is.close();
@@ -65,7 +64,7 @@ public class NLPFactory {
 	 * @throws InvalidFormatException
 	 * @throws IOException
 	 */
-	public static String[] tokenize(String text, String modelPath)
+	public static String[] getTokens(String text, String modelPath)
 			throws InvalidFormatException, IOException {
 		InputStream is = new FileInputStream(modelPath);
 		TokenizerModel model = new TokenizerModel(is);
@@ -82,14 +81,19 @@ public class NLPFactory {
 	 * @return
 	 * @throws IOException
 	 */
-	public static Span[] findNames(String[] text, String modelPath)
+	public static String[] getNames(String[] text, String modelPath)
 			throws IOException {
 		InputStream is = new FileInputStream(modelPath);
 		TokenNameFinderModel model = new TokenNameFinderModel(is);
 		is.close();
 		NameFinderME nameFinder = new NameFinderME(model);
 		Span nameSpans[] = nameFinder.find(text);
-		return nameSpans;
+		String[] names = new String[nameSpans.length];
+		int count = 0;
+		for(Span span : nameSpans) {
+			names[count++] = span.toString();
+		}
+		return names;
 	}
 
 	public static void POSTag(String text, String modelPath) throws IOException {

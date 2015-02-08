@@ -1,19 +1,14 @@
 package open.sesame;
 
-import java.io.IOException;
-
-import open.sesame.nlp.NLPFactory;
-import opennlp.tools.util.InvalidFormatException;
+import open.sesame.swing.SwingGUI;
 
 
 public class Main {
-	
-	private static String MODELS_DIR = System.getProperty("user.dir") + "/models/en/";
 
-	public static void main(String[] args) throws InvalidFormatException, IOException {
-		String text = "hey, what's up? how are you? my name is James. this is open nlp don't you know?";
-
+	public static void main(String[] args) {
 		
+		new SwingGUI();
+		/*
 		//sentences
 		String modelPath = MODELS_DIR + "en-sent.bin";
 		for(String s : NLPFactory.detectSentences(text, modelPath)) {
@@ -36,14 +31,14 @@ public class Main {
 		//pos
 		modelPath = MODELS_DIR + "en-pos-maxent.bin";
 		NLPFactory.POSTag(text, modelPath);
-		*/
+		
 		String modelPOSPath = MODELS_DIR + "en-pos-maxent.bin";
 		String modelChunkerPath = MODELS_DIR + "en-chunker.bin";
 		NLPFactory.chunk(text, modelPOSPath, modelChunkerPath);
 		
 		modelPath = MODELS_DIR + "en-parser-chunking.bin";
 		NLPFactory.parse(text, modelPath);
-
+		 */
 	}
 
 }

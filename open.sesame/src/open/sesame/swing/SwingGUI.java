@@ -1,3 +1,7 @@
+/**
+ * en-pos-maxent.bin uses tags from https://www.ling.upenn.edu/courses/Fall_2003/ling001/penn_treebank_pos.html
+ */
+
 package open.sesame.swing;
 
 import java.awt.Dimension;
@@ -6,33 +10,40 @@ import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
-import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
+import javax.swing.JTable;
 import javax.swing.JTextArea;
+import javax.swing.table.DefaultTableModel;
 
 import open.sesame.nlp.NLPFactory;
+import open.sesame.nlp.PennTreebankPOS;
+import open.sesame.nlp.StopWords;
 
 public class SwingGUI {
 	private final String MODELS_DIRECTORY = System.getProperty("user.dir") + "/models/en/";
+	private final PennTreebankPOS POS = new PennTreebankPOS();
 	
 	JFrame frame;
+	JCheckBox cbStopWords;
 	JTextArea txtDocumentArea;
 	JLabel lblSentence;
-	JList<String> listTokens;
-	DefaultListModel<String> modelTokens;
 	JList<String> listNames;
+	JTable tokenTable;
+	DefaultTableModel modelTokenTable;
 	DefaultListModel<String> modelNames;
-	JList<String> listPOS;
-	DefaultListModel<String> modelPOS;
+	Box boxPanel;
 	
 	private String[] sentences;
 	private int sentenceIndex = 0;
@@ -42,7 +53,10 @@ public class SwingGUI {
 		//button bar
 		JPanel pnlButtons = new JPanel(new FlowLayout());
 		JButton btnProcess = new JButton("Process");
+		cbStopWords = new JCheckBox("Include Stop Words");
+		cbStopWords.setSelected(true);
 		pnlButtons.add(btnProcess);
+		pnlButtons.add(cbStopWords);
 		
 		//text area
 		JPanel pnlTextArea = new JPanel();
@@ -63,27 +77,34 @@ public class SwingGUI {
 		
 		//list views
 		JPanel pnlLists = new JPanel(new FlowLayout());
-		listTokens = new JList<String>();
 		listNames = new JList<String>();
-		listPOS = new JList<String>();
-		modelTokens = new DefaultListModel<String>();
 		modelNames = new DefaultListModel<String>();
-		modelPOS = new DefaultListModel<String>();
-		listTokens.setModel(modelTokens);
 		listNames.setModel(modelNames);
-		listPOS.setModel(modelPOS);
-		JScrollPane paneTokens = new JScrollPane(listTokens);
+		listNames.setFixedCellWidth(200);
 		JScrollPane paneNames = new JScrollPane(listNames);
-		JScrollPane panePOS = new JScrollPane(listPOS);
-		pnlLists.add(paneTokens);
 		pnlLists.add(paneNames);
-		pnlLists.add(panePOS);
 		
-		Box boxPanel = new Box(BoxLayout.Y_AXIS);
+		//table
+		JPanel pnlTable = new JPanel();
+		modelTokenTable = new DefaultTableModel();
+		modelTokenTable.addColumn("Token");
+		modelTokenTable.addColumn("POS");
+		modelTokenTable.addColumn("Chunk");
+		tokenTable = new JTable(modelTokenTable);
+		JScrollPane paneTable = new JScrollPane(tokenTable);
+		pnlTable.add(paneTable);
+
+		//table and list panel
+		JPanel pnlTableAndLists = new JPanel(new FlowLayout());
+		pnlTableAndLists.add(pnlTable);
+		pnlTableAndLists.add(pnlLists);
+		
+		//box panel
+		boxPanel = new Box(BoxLayout.Y_AXIS);
 		boxPanel.add(pnlButtons);
 		boxPanel.add(pnlTextArea);
 		boxPanel.add(pnlSentence);
-		boxPanel.add(pnlLists);
+		boxPanel.add(pnlTableAndLists);
 		
 		btnProcess.addActionListener(new ActionListener() {
 			@Override
@@ -128,40 +149,54 @@ public class SwingGUI {
 		int x = (dim.width - w) / 2;
 		int y = (dim.height - h) / 2;
 		frame.setLocation(x, y);
+		frame.setExtendedState(JFrame.MAXIMIZED_BOTH); 
 	}
 	private void updateView() {
-		modelTokens.removeAllElements();
 		modelNames.removeAllElements();
-		modelPOS.removeAllElements();
+		int rows = modelTokenTable.getRowCount();
+		for(int i = rows - 1; i > -1; i--) {
+			modelTokenTable.removeRow(i);
+		}
 		try {
 			printSentence();
 			String[] tokens = NLPFactory.getTokens(sentences[sentenceIndex], MODELS_DIRECTORY + "en-token.bin");
-			printTokens(tokens);
-			String[] names = NLPFactory.getNames(tokens, MODELS_DIRECTORY + "en-ner-person.bin");
-			printNames(names);
+			if(!cbStopWords.isSelected()) {
+				tokens = removeStopWords(tokens);
+			}
 			String[] tags = NLPFactory.getPOS(tokens, MODELS_DIRECTORY + "en-pos-maxent.bin");
-			printPOS(tags);
+			String[] names = NLPFactory.getNames(tokens, MODELS_DIRECTORY + "en-ner-person.bin");
+			String[] chunks = NLPFactory.getChunks(tokens, tags, MODELS_DIRECTORY + "en-chunker.bin");
+			printTokenTable(tokens, tags, chunks);
+			printNames(names);
 		} catch (IOException ex) {
 			ex.printStackTrace();
 		}
-		
+	}
+	private String[] removeStopWords(String[] tokens) {
+		ArrayList<String> list = new ArrayList<String>();
+		StopWords sw = new StopWords();
+		for(String s : tokens) {
+			if(!sw.contains(s)) {
+				list.add(s);
+			}
+		}
+		return list.toArray(new String[list.size()]);
 	}
 	private void printSentence() {
-		lblSentence.setText("<html><p>" + sentences[sentenceIndex] + "</p></html>");
+		lblSentence.setText(sentences[sentenceIndex]);
 	}
-	private void printTokens(String[] tokens) {
-		for(String token : tokens) {
-			modelTokens.addElement(token);
+	private void printTokenTable(String[] tokens, String[] tags, String[] chunks) {
+		if(tokens.length != tags.length && tokens.length != chunks.length) {
+			throw new Error("tokens, tags, and chunks do not match up - debug it!");
+		} else {
+			for(int i = 0; i < tokens.length; i++) {
+				modelTokenTable.addRow(new Object[]{tokens[i], POS.get(tags[i]), chunks[i]});
+			}
 		}
 	}
 	private void printNames(String[] names) {
 		for(String name : names) {
 			modelNames.addElement(name);
-		}
-	}
-	private void printPOS(String[] tags) {
-		for(String tag : tags) {
-			modelPOS.addElement(tag);
 		}
 	}
 }

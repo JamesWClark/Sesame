@@ -27,6 +27,29 @@ public class StopWords {
 			return false;
 	}
 	
+	/**
+	 * remove stop words from tokens
+	 * @param tokens
+	 * @return
+	 */
+	public String[] removeStopWordsFromTokens(String[] tokens) {
+		ArrayList<String> internalList = new ArrayList<String>();
+		for(String s : tokens) {
+			if(!this.list.contains(s)) {
+				internalList.add(s);
+			}
+		}
+		return internalList.toArray(new String[internalList.size()]);
+	}
+	
+	public boolean containsStopWord(String word) {
+		if(this.list.contains(word))
+			return true;
+		else
+			return false;
+		
+	}
+	
 	private void buildDefaultEnglishList() {
 		list.add("a");
 		list.add("about");

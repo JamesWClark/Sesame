@@ -9,9 +9,10 @@ import java.awt.FlowLayout;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -21,6 +22,7 @@ import javax.swing.JCheckBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
@@ -30,10 +32,13 @@ import javax.swing.table.DefaultTableModel;
 import open.sesame.nlp.NLPFactory;
 import open.sesame.nlp.PennTreebankPOS;
 import open.sesame.nlp.StopWords;
+import open.sesame.nlp.WordNet;
 
 public class SwingGUI {
 	private final String MODELS_DIRECTORY = System.getProperty("user.dir") + "/models/en/";
 	private final PennTreebankPOS POS = new PennTreebankPOS();
+	private final StopWords stopwords = new StopWords();
+	private WordNet wordnet;
 	
 	JFrame frame;
 	JCheckBox cbStopWords;
@@ -49,6 +54,8 @@ public class SwingGUI {
 	private int sentenceIndex = 0;
 
 	public SwingGUI() {
+		
+		getWordNet(System.getenv("WORDNET_HOME" + File.separator + "dict"));
 		
 		//button bar
 		JPanel pnlButtons = new JPanel(new FlowLayout());
@@ -90,6 +97,7 @@ public class SwingGUI {
 		modelTokenTable.addColumn("Token");
 		modelTokenTable.addColumn("POS");
 		modelTokenTable.addColumn("Chunk");
+		modelTokenTable.addColumn("Stems");
 		tokenTable = new JTable(modelTokenTable);
 		JScrollPane paneTable = new JScrollPane(tokenTable);
 		pnlTable.add(paneTable);
@@ -149,8 +157,22 @@ public class SwingGUI {
 		int x = (dim.width - w) / 2;
 		int y = (dim.height - h) / 2;
 		frame.setLocation(x, y);
-		frame.setExtendedState(JFrame.MAXIMIZED_BOTH); 
+		frame.setExtendedState(JFrame.MAXIMIZED_BOTH); // fullscreen
 	}
+	
+	//open a wordnet connection
+	private void getWordNet(String wordnetPath) {
+		try {
+			wordnet = new WordNet(wordnetPath);
+		} catch(NullPointerException | IOException ex) {
+			String retryPath = JOptionPane.showInputDialog(frame, "Path to local WordNet dict directory: ");
+			if(retryPath == null)
+				System.exit(0);
+			else
+				getWordNet(retryPath);
+		}
+	}
+	
 	private void updateView() {
 		modelNames.removeAllElements();
 		int rows = modelTokenTable.getRowCount();
@@ -161,7 +183,7 @@ public class SwingGUI {
 			printSentence();
 			String[] tokens = NLPFactory.getTokens(sentences[sentenceIndex], MODELS_DIRECTORY + "en-token.bin");
 			if(!cbStopWords.isSelected()) {
-				tokens = removeStopWords(tokens);
+				tokens = stopwords.removeStopWordsFromTokens(tokens);
 			}
 			String[] tags = NLPFactory.getPOS(tokens, MODELS_DIRECTORY + "en-pos-maxent.bin");
 			String[] names = NLPFactory.getNames(tokens, MODELS_DIRECTORY + "en-ner-person.bin");
@@ -172,28 +194,21 @@ public class SwingGUI {
 			ex.printStackTrace();
 		}
 	}
-	private String[] removeStopWords(String[] tokens) {
-		ArrayList<String> list = new ArrayList<String>();
-		StopWords sw = new StopWords();
-		for(String s : tokens) {
-			if(!sw.contains(s)) {
-				list.add(s);
-			}
-		}
-		return list.toArray(new String[list.size()]);
-	}
+	
 	private void printSentence() {
 		lblSentence.setText(sentences[sentenceIndex]);
 	}
+	
 	private void printTokenTable(String[] tokens, String[] tags, String[] chunks) {
 		if(tokens.length != tags.length && tokens.length != chunks.length) {
-			throw new Error("tokens, tags, and chunks do not match up - debug it!");
+			throw new Error("tokens, tags, and chunks do not match length!");
 		} else {
 			for(int i = 0; i < tokens.length; i++) {
 				modelTokenTable.addRow(new Object[]{tokens[i], POS.get(tags[i]), chunks[i]});
 			}
 		}
 	}
+	
 	private void printNames(String[] names) {
 		for(String name : names) {
 			modelNames.addElement(name);

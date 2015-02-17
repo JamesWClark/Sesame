@@ -1,44 +1,99 @@
 package open.sesame;
 
-import open.sesame.swing.SwingGUI;
+import java.io.IOException;
+import java.util.Scanner;
 
+import open.sesame.nlp.Models;
+import open.sesame.nlp.NLPFactory;
+import opennlp.tools.coref.DiscourseEntity;
 
 public class Main {
+	
+	public static final String WORDNET_PATH = "C:/Program Files (x86)/WordNet/3.0/dict";
 
-	public static void main(String[] args) {
+	private static Scanner scanner = null;		
+
+	public static void main(String[] args) throws IOException {
 		
-		new SwingGUI();
+
 		/*
-		//sentences
-		String modelPath = MODELS_DIR + "en-sent.bin";
-		for(String s : NLPFactory.detectSentences(text, modelPath)) {
+		//let args[0] = path to input file
+		if(args.length > 0) {
+			String inputPath = args[0];
+			System.out.println("Attempting to read from: " + args[0]);
+			new TSVWriter(new File(inputPath));
+		} else {
+			new SwingGUI();
+		}
+		*/
+		/* COREF */
+		String sentence = "Pierre Vinken, 61 years old, will join the board as a nonexecutive director Nov. 29.";
+
+		DiscourseEntity entity = NLPFactory.coref(sentence, Models.COREFERENCE)[0];
+		System.out.println(entity.toString());
+		
+		
+		
+		/* PARSER
+		//where is the document analyzer model ???
+		String modelPath = MODELS_DIRECTORY + "en-parser-chunking.bin";
+		String inputText = args[0];
+		*/
+
+		/* doc level analysis requires models we do not yet have - maybe we need to train them
+		DocumentCategorizerME myCategorizer = new DocumentCategorierME(m);
+		double[] outcomes = myCategorizer.categorize(inputText);
+		String category = myCategorizer.getBestOutcome();
+		*?
+		
+		
+		//String modelPath = MODELS_DIRECTORY + "en-parser-chunking.bin";
+		//System.out.println(NLPFactory.parse(args[0], modelPath));
+
+		/* WORDNET
+		WordNet wordnet = new WordNet(WORDNET_PATH);
+		String word = "therapy";
+		POS pos = POS.NOUN;
+		for(String s : wordnet.getStems(word, pos)) {
+			System.out.println(s);
+			IWord iword = wordnet.getIWord(s, pos);
+			for(IWordID id : iword.getRelatedWords()) {
+				System.out.print(wordnet.getWord(id).getLemma() + ", ");
+			}
+			System.out.println(iword.getLemma());	
+		}
+		
+		
+		/*
+		List<String> stems = wordnet.getStems("cleaned", POS.VERB);
+
+		for(String s : stems) {
 			System.out.println(s);
 		}
+		
 		/*
-		//tokens
-		modelPath = MODELS_DIR + "en-token.bin";
-		String[] tokens = NLPFactory.tokenize(text, modelPath);
-		for(String s : tokens) {
-			System.out.println(s);
-		}
+		String document = args[0];
 		
-		//names
-		modelPath = MODELS_DIR + "en-ner-person.bin";
-		for(Span s : NLPFactory.findNames(tokens, modelPath)) {
-			System.out.println(s.toString());
-		}
+		try {
+			String[] sentences = NLPFactory.getSentences(document, MODELS_DIRECTORY + "en-sent.bin");
+			int count = 1;
+			for(String s : sentences)
+				System.out.println("Sentence " + count++ + ": " + s);
+
+			/*
+			String[] tokens = NLPFactory.getTokens(sentences[sentenceIndex], MODELS_DIRECTORY + "en-token.bin");
+			for(String s : tokens) {
+				System.out.print(s + ", ");
+			}
+			String[] tags = NLPFactory.getPOS(tokens, MODELS_DIRECTORY + "en-pos-maxent.bin");
+			String[] names = NLPFactory.getNames(tokens, MODELS_DIRECTORY + "en-ner-person.bin");
+			String[] chunks = NLPFactory.getChunks(tokens, tags, MODELS_DIRECTORY + "en-chunker.bin");
+			printTokenTable(tokens, tags, chunks);
+			printNames(names);
+			
+		} catch (IOException ex) {
+			ex.printStackTrace();
+		}*/
 		
-		//pos
-		modelPath = MODELS_DIR + "en-pos-maxent.bin";
-		NLPFactory.POSTag(text, modelPath);
-		
-		String modelPOSPath = MODELS_DIR + "en-pos-maxent.bin";
-		String modelChunkerPath = MODELS_DIR + "en-chunker.bin";
-		NLPFactory.chunk(text, modelPOSPath, modelChunkerPath);
-		
-		modelPath = MODELS_DIR + "en-parser-chunking.bin";
-		NLPFactory.parse(text, modelPath);
-		 */
 	}
-
 }

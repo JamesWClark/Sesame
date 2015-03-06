@@ -29,10 +29,10 @@ import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.table.DefaultTableModel;
 
-import open.sesame.nlp.NLPFactory;
-import open.sesame.nlp.PennTreebankPOS;
-import open.sesame.nlp.StopWords;
-import open.sesame.nlp.WordNet;
+import open.sesame.opennlp.NLPFactory;
+import open.sesame.opennlp.PennTreebankPOS;
+import open.sesame.opennlp.StopWords;
+import open.sesame.opennlp.WordNet;
 
 public class SwingGUI {
 	private final String MODELS_DIRECTORY = System.getProperty("user.dir") + "/models/en/";

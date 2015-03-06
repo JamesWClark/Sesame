@@ -2,7 +2,7 @@
  * http://www.ranks.nl/stopwords
  */
 
-package open.sesame.nlp;
+package open.sesame.opennlp;
 
 import java.util.ArrayList;
 

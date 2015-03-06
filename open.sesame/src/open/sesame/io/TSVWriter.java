@@ -10,11 +10,11 @@ import java.util.HashMap;
 import java.util.Scanner;
 
 import open.sesame.Main;
-import open.sesame.nlp.Models;
-import open.sesame.nlp.NLPFactory;
-import open.sesame.nlp.PennTreebankPOS;
-import open.sesame.nlp.StopWords;
-import open.sesame.nlp.WordNet;
+import open.sesame.opennlp.Models;
+import open.sesame.opennlp.NLPFactory;
+import open.sesame.opennlp.PennTreebankPOS;
+import open.sesame.opennlp.StopWords;
+import open.sesame.opennlp.WordNet;
 import opennlp.tools.util.Span;
 import edu.mit.jwi.item.POS;
 

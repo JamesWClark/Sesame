@@ -1,4 +1,4 @@
-package open.sesame.nlp;
+package open.sesame.opennlp;
 
 public class Models {
 	private static String pathToModels = System.getProperty("user.dir") + "/models/en/";

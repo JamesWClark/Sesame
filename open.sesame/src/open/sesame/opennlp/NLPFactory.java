@@ -5,7 +5,7 @@
  * todo: attach source code and/or javadocs
  */
 
-package open.sesame.nlp;
+package open.sesame.opennlp;
 
 import java.io.FileInputStream;
 import java.io.IOException;

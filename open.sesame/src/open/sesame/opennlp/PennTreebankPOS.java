@@ -1,4 +1,4 @@
-package open.sesame.nlp;
+package open.sesame.opennlp;
 
 import java.util.HashMap;
 

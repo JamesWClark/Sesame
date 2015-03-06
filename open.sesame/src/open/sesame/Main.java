@@ -3,8 +3,8 @@ package open.sesame;
 import java.io.IOException;
 import java.util.Scanner;
 
-import open.sesame.nlp.Models;
-import open.sesame.nlp.NLPFactory;
+import open.sesame.opennlp.Models;
+import open.sesame.opennlp.NLPFactory;
 import opennlp.tools.coref.DiscourseEntity;
 
 public class Main {

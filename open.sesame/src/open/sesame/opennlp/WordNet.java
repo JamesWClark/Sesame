@@ -2,7 +2,7 @@
  * uses http://projects.csail.mit.edu/jwi/
  */
 
-package open.sesame.nlp;
+package open.sesame.opennlp;
 
 import java.io.IOException;
 import java.net.URL;

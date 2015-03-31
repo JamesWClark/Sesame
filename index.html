@@ -18,10 +18,15 @@
       var reader = null;
       for (var i = 0, f; f = files[i]; i++) {
         reader = new FileReader();
-        reader.readas(f);
+        reader.readAsText(f);
         reader.onloadend = function () {
-          var xmld = reader.result;
-          document.write(xmld);
+          var parser = new DOMParser();
+          var doc = parser.parseFromString(reader.result, "application/xml");
+          var sentence = doc.getElementsByTagName('sentence')[0];
+          var attr = sentence.attributes[2];
+          document.write(attr.value);
+          document.write(sentence.value);
+
         };
       }
       document.getElementById('list').innerHTML = '<ul>' + output.join('') + '</ul>';

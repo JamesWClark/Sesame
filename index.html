@@ -3,36 +3,17 @@
 <head>
   <title>CoreNLP View</title>
   <link href="assets/css/main.css" rel="stylesheet" />
-  <script src="assets/js/main.js"></script>
+  <script src="https://code.jquery.com/jquery-1.11.2.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.11.4/jquery-ui.min.js"></script>
 </head>
 <body>
   <input type="file" id="files" name="files[]" multiple />
+  <hr />
+  <output id="summarySentimentValue"></output>
+  <br />
   <output id="list"></output>
 
-  <script>
-    function handleFileSelect(evt) {
-      var files = evt.target.files; // FileList object
+  <script src="assets/js/main.js"></script>
 
-      // files is a FileList of File objects. List some properties.
-      var output = [];
-      var reader = null;
-      for (var i = 0, f; f = files[i]; i++) {
-        reader = new FileReader();
-        reader.readAsText(f);
-        reader.onloadend = function () {
-          var parser = new DOMParser();
-          var doc = parser.parseFromString(reader.result, "application/xml");
-          var sentence = doc.getElementsByTagName('sentence')[0];
-          var attr = sentence.attributes[2];
-          document.write(attr.value);
-          document.write(sentence.value);
-
-        };
-      }
-      document.getElementById('list').innerHTML = '<ul>' + output.join('') + '</ul>';
-    }
-
-    document.getElementById('files').addEventListener('change', handleFileSelect, false);
-  </script>
 </body>
 </html>

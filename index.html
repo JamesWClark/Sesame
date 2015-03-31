@@ -1,0 +1,33 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <title>CoreNLP View</title>
+  <link href="assets/css/main.css" rel="stylesheet" />
+  <script src="assets/js/main.js"></script>
+</head>
+<body>
+  <input type="file" id="files" name="files[]" multiple />
+  <output id="list"></output>
+
+  <script>
+    function handleFileSelect(evt) {
+      var files = evt.target.files; // FileList object
+
+      // files is a FileList of File objects. List some properties.
+      var output = [];
+      var reader = null;
+      for (var i = 0, f; f = files[i]; i++) {
+        reader = new FileReader();
+        reader.readas(f);
+        reader.onloadend = function () {
+          var xmld = reader.result;
+          document.write(xmld);
+        };
+      }
+      document.getElementById('list').innerHTML = '<ul>' + output.join('') + '</ul>';
+    }
+
+    document.getElementById('files').addEventListener('change', handleFileSelect, false);
+  </script>
+</body>
+</html>

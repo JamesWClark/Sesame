@@ -1,19 +1,29 @@
 ﻿<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
+
 <head>
   <title>CoreNLP View</title>
   <link href="assets/css/main.css" rel="stylesheet" />
   <script src="https://code.jquery.com/jquery-1.11.2.min.js"></script>
   <script src="https://code.jquery.com/ui/1.11.4/jquery-ui.min.js"></script>
 </head>
+
 <body>
   <input type="file" id="files" name="files[]" multiple />
   <hr />
-  <output id="summarySentimentValue"></output>
-  <br />
-  <output id="list"></output>
+  
+  <ol class="term-list" id="word-frequency"></ol>
+  <ol class="term-list" id="lemma-frequency"></ol>
+
+  <br /><output id="totalSentimentScore"></output>
+  <br /><output id="totalWordCount"></output>
+  <br /><output id="totalLemmaCount"></output>
+  <br /><output id="totalSentences"></output>
+
+  <br /><output id="list"></output>
+  
 
   <script src="assets/js/main.js"></script>
-
 </body>
+
 </html>

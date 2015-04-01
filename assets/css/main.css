@@ -1,2 +1,7 @@
 ﻿body {
 }
+ol.term-list {
+	display: inline-block;
+	width: 150px;
+	float: left;
+}

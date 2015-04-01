@@ -1,5 +1,12 @@
 ﻿body {
 }
+#display {
+	display: none;
+}
+#current-document {
+	width: 15px;
+	text-align: center;
+}
 ol.term-list {
 	display: inline-block;
 	width: 150px;

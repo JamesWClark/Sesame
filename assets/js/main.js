@@ -20,20 +20,26 @@ var totalDocumentsProcessed = 0;
 var totalDocumentCount = 0;
 var totalWordCount = 0;
 var totalLemmaCount = 0;
+var totalSentenceCount = 0;
+var totalSentimentScore = 0;
 var collectDocuments = {};
 var collectLemmas = {};
 var collectWords = {};
-var wordNotCounted = [];
+var discardWords = [];
+var discardLemmas = [];
 
 function reset() {
 	totalDocumentsProcessed = 0;
 	totalDocumentCount = 0;
 	totalWordCount = 0;
 	totalLemmaCount = 0;
+	totalSentenceCount = 0;
+	totalSentimentScore = 0;
 	collectDocuments = {};
 	collectLemmas = {};
 	collectWords = {};
-	wordNotCounted = [];
+	discardWords = [];
+	discardLemmas = [];
 	$('output').html('');
 }
 
@@ -72,11 +78,15 @@ function evaluateSentimentLabelScore(sentimentLabel) {
 }
 
 function incrementLemmaCounts(lemma) {
-	if (!(lemma in collectLemmas))
-		collectLemmas[lemma] = 1;
+	if (lemma.match(/^[0-9a-z]+$/) || lemma.length > 1 || lemma === "i".toUpperCase()) {
+		if (!(lemma in collectLemmas))
+			collectLemmas[lemma] = 1;
+		else
+			collectLemmas[lemma]++;
+		totalLemmaCount++;
+	}
 	else
-		collectLemmas[lemma]++;
-	totalLemmaCount++;
+		discardLemmas.push(lemma);
 }
 
 function incrementWordCounts(word) {
@@ -88,7 +98,7 @@ function incrementWordCounts(word) {
 		totalWordCount++;
 	}
 	else
-		wordNotCounted.push(word);
+		discardWords.push(word);
 }
 
 function parseCoreNLPXML() {
@@ -100,7 +110,6 @@ function parseCoreNLPXML() {
 			var parser = new DOMParser();
 			var xml = parser.parseFromString(collectDocuments[fileName], "application/xml");
 			var sentences = xml.getElementsByTagName('sentences')[0].children;
-			var totalSentimentScore = 0;
 			var html = '';
 
 			//foreach sentence
@@ -124,18 +133,16 @@ function parseCoreNLPXML() {
 					tokenSentence += word + ' ';
 				}
 				totalSentimentScore += evaluateSentimentLabelScore(sentimentLabel);
+				totalSentenceCount++;
 
 				html += '<br><div>' + (i + 1) + ': ' + sentimentLabel + '</div><div>' + tokenSentence + '</div>';
 			}
-			var containerDocument = '<div id="' + fileName + '">' + html + '</div>';
+			var containerDocument = '<div id="' + fileName + '">' + html + '</div><br><hr>';
 			$('#totalSentimentScore').html('<b>Total Sentiment Score:</b> ' + totalSentimentScore);
 			$('#totalWordCount').html('<b>Word Count:</b> ' + totalWordCount);
 			$('#totalLemmaCount').html('<b>Lemma Count:</b> ' + totalLemmaCount);
-			$('#totalSentences').html('<b>Sentences:</b> ' + sentences.length);
+			$('#totalSentences').html('<b>Sentences:</b> ' + totalSentenceCount);
 			$('#container-documents').append(containerDocument);
-
-			//console.log(sentences);
-			//console.log(wordNotCounted);
 		}
 	}
 	var lemmaList = $('#lemma-frequency');
@@ -152,6 +159,8 @@ function parseCoreNLPXML() {
 		}
 	}
 	$('#display').show();
+	console.log(discardWords);
+	console.log(discardLemmas);
 }
 
 

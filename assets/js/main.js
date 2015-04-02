@@ -9,12 +9,6 @@ learned a closure - http://stackoverflow.com/questions/12546775/get-filename-aft
 
 */
 
-// Check for the various File API support.
-if (window.File && window.FileReader && window.FileList && window.Blob) {
-	console.log('All the File APIs are supported.');
-} else {
-	alert('The File APIs are not fully supported in this browser.');
-}
 
 var totalDocumentsProcessed = 0;
 var totalDocumentCount = 0;
@@ -41,6 +35,7 @@ function reset() {
 	discardWords = [];
 	discardLemmas = [];
 	$('output').html('');
+	$('ol').html('');
 }
 
 function tf() {
@@ -77,29 +72,40 @@ function evaluateSentimentLabelScore(sentimentLabel) {
 	}
 }
 
-function incrementLemmaCounts(lemma) {
+function incrementLemmaCounts(lemma, fileKey) {
 	if (lemma.match(/^[0-9a-z]+$/) || lemma.length > 1 || lemma === "i".toUpperCase()) {
-		if (!(lemma in collectLemmas))
-			collectLemmas[lemma] = 1;
-		else
-			collectLemmas[lemma]++;
+		if (!(lemma in collectLemmas)) {
+			collectLemmas[lemma] = {};
+			collectLemmas[lemma].value = 1;
+			collectLemmas[lemma].set = new Set();
+			collectLemmas[lemma].set.add(fileKey);
+		} else {
+			collectLemmas[lemma].value++;
+			collectLemmas[lemma].set.add(fileKey);
+		}
 		totalLemmaCount++;
 	}
 	else
 		discardLemmas.push(lemma);
 }
 
-function incrementWordCounts(word) {
+function incrementWordCounts(word, fileKey) {
 	if (word.match(/^[0-9a-z]+$/) || word.length > 1 || word === "i".toUpperCase()) {
-		if (!(word in collectWords))
-			collectWords[word] = 1;
-		else
-			collectWords[word]++;
+		if (!(word in collectWords)) {
+			collectWords[word] = {};
+			collectWords[word].value = 1;
+			collectWords[word].set = new Set();
+			collectWords[word].set.add(fileKey);
+		} else {
+			collectWords[word].value++;
+			collectWords[word].set.add(fileKey);
+		}
 		totalWordCount++;
 	}
 	else
 		discardWords.push(word);
 }
+
 
 function parseCoreNLPXML() {
 
@@ -128,8 +134,8 @@ function parseCoreNLPXML() {
 					var iSpeaker = 6;
 					var word = tokens[k].children[iWord].textContent;
 					var lemma = tokens[k].children[iLemma].textContent;
-					incrementWordCounts(word);
-					incrementLemmaCounts(lemma);
+					incrementWordCounts(word, fileName);
+					incrementLemmaCounts(lemma, fileName);
 					tokenSentence += word + ' ';
 				}
 				totalSentimentScore += evaluateSentimentLabelScore(sentimentLabel);
@@ -145,22 +151,36 @@ function parseCoreNLPXML() {
 			$('#container-documents').append(containerDocument);
 		}
 	}
+
 	var lemmaList = $('#lemma-frequency');
 	for (var key in collectLemmas) {
-		if (collectLemmas.hasOwnProperty(key)) {
-			$(lemmaList).append('<li>' + key + ': ' + (collectLemmas[key] / totalLemmaCount).toFixed(5) + '</li>')
+		if (collectLemmas.hasOwnProperty(key)) { 
+			//$(lemmaList).append('<li>' + key + ': ' + (collectLemmas[key].value / totalLemmaCount).toFixed(5) + ' : ' + Math.log10(collectLemmas[key].set.size() / totalDocumentCount) + '</li>')
+			var precision = 5;
+			var lemmaCount = collectLemmas[key].value;
+			var numFilesContainingLemma = collectLemmas[key].set.size;
+			var tf = (lemmaCount / totalLemmaCount).toFixed(precision);
+			var idf = (Math.log10(totalDocumentCount / numFilesContainingLemma)).toFixed(precision);
+			$(lemmaList).append('<li>' + key + ': ' + tf + ' : ' + idf + '</li>');
 		}
 	}
 
 	var wordList = $('#word-frequency');
 	for (var key in collectWords) {
 		if (collectWords.hasOwnProperty(key)) {
-			$(wordList).append('<li>' + key + ': ' + (collectWords[key] / totalWordCount).toFixed(5) + '</li>')
+			var precision = 5;
+			var wordCount = collectWords[key].value;
+			var numFilesContainingWord = collectWords[key].set.size;
+			var tf = (wordCount / totalWordCount).toFixed(precision);
+			var idf = (Math.log10(totalDocumentCount / numFilesContainingWord)).toFixed(precision);
+			$(wordList).append('<li>' + key + ': ' + tf + ' : ' + idf + '</li>');
 		}
 	}
+
 	$('#display').show();
 	console.log(discardWords);
 	console.log(discardLemmas);
+	console.log(collectWords);
 }
 
 

@@ -38,12 +38,46 @@ function reset() {
 	$('ol').html('');
 }
 
-function tf() {
-
+function print() {
+	var sortable = [];
+	for (var key in collectWords)
+		sortable.push([key, collectWords[key].tfidf]);
+	sortable.sort(function (a, b) { return b[1] - a[1] });
+	console.log(sortable);
+	var lemmaList = $('#lemma-frequency');
+	for (var i = 0; i < sortable.length; i++) {
+		$(lemmaList).append('<li>' + sortable[i][0] + " : " + (sortable[i][1]).toFixed(6) + '</li>');
+	}
 }
 
-function idf() {
+function tfidf() {
+	//var lemmaList = $('#lemma-frequency'); 
+	for (var key in collectLemmas) {
+		if (collectLemmas.hasOwnProperty(key)) {
+			var precision = 5;
+			var lemmaCount = collectLemmas[key].value;
+			var numFilesContainingLemma = collectLemmas[key].set.size;
+			var tf = lemmaCount / totalLemmaCount;
+			var idf = Math.log10(totalDocumentCount / numFilesContainingLemma);
+			var tfidf = tf * idf;
+			collectLemmas[key].tfidf = tfidf;
+			//$(lemmaList).append('<li>' + key + ': ' + tf + ' : ' + idf + '</li>');
+		}
+	}
 
+
+	//var wordList = $('#word-frequency');
+	for (var key in collectWords) {
+		if (collectWords.hasOwnProperty(key)) {
+			var wordCount = collectWords[key].value;
+			var numFilesContainingWord = collectWords[key].set.size;
+			var tf = wordCount / totalWordCount;
+			var idf = Math.log10(totalDocumentCount / numFilesContainingWord);
+			var tfidf = tf * idf;
+			collectWords[key].tfidf = tfidf;
+			//$(wordList).append('<li>' + key + ': ' + tf + ' : ' + idf + '</li>');
+		}
+	}
 }
 
 function SentimentFormatException(sentiment) {
@@ -152,30 +186,8 @@ function parseCoreNLPXML() {
 		}
 	}
 
-	var lemmaList = $('#lemma-frequency');
-	for (var key in collectLemmas) {
-		if (collectLemmas.hasOwnProperty(key)) { 
-			//$(lemmaList).append('<li>' + key + ': ' + (collectLemmas[key].value / totalLemmaCount).toFixed(5) + ' : ' + Math.log10(collectLemmas[key].set.size() / totalDocumentCount) + '</li>')
-			var precision = 5;
-			var lemmaCount = collectLemmas[key].value;
-			var numFilesContainingLemma = collectLemmas[key].set.size;
-			var tf = (lemmaCount / totalLemmaCount).toFixed(precision);
-			var idf = (Math.log10(totalDocumentCount / numFilesContainingLemma)).toFixed(precision);
-			$(lemmaList).append('<li>' + key + ': ' + tf + ' : ' + idf + '</li>');
-		}
-	}
-
-	var wordList = $('#word-frequency');
-	for (var key in collectWords) {
-		if (collectWords.hasOwnProperty(key)) {
-			var precision = 5;
-			var wordCount = collectWords[key].value;
-			var numFilesContainingWord = collectWords[key].set.size;
-			var tf = (wordCount / totalWordCount).toFixed(precision);
-			var idf = (Math.log10(totalDocumentCount / numFilesContainingWord)).toFixed(precision);
-			$(wordList).append('<li>' + key + ': ' + tf + ' : ' + idf + '</li>');
-		}
-	}
+	tfidf();
+	print();
 
 	$('#display').show();
 	console.log(discardWords);

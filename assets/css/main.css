@@ -9,6 +9,6 @@
 }
 ol.term-list {
 	display: inline-block;
-	width: 150px;
+	padding-right: 10px;
 	float: left;
 }

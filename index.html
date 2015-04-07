@@ -12,21 +12,17 @@
   <input type="file" id="files" name="files[]" multiple />
   <hr />
 
-  <div id="display">
-    <div id="button-bar">
-      <button> &lt; </button> <input id="current-document" type="text" style="width: 15px;" /> / <span id="totalDocuments"></span> <button> &gt; </button>
-    </div>
-    <div id="data">
-      <ol class="term-list" id="word-frequency"></ol>
-      <ol class="term-list" id="lemma-frequency"></ol>
 
-      <br /><output id="totalSentimentScore"></output>
-      <br /><output id="totalWordCount"></output>
-      <br /><output id="totalLemmaCount"></output>
-      <br /><output id="totalSentences"></output>
-
-      <br /><output id="container-documents"></output>
-    </div>
+  <div id="button-bar">
+    <button> &lt; </button> <input id="current-document" type="text" style="width: 15px;" /> / <span id="totalDocuments"></span> <button> &gt; </button>
+  </div>
+  <div id="data">
+    <ol class="term-list" id="token-list"></ol>
+    <br /><output id="totalSentimentScore"></output>
+    <br /><output id="totalWordCount"></output>
+    <br /><output id="totalLemmaCount"></output>
+    <br /><output id="totalSentences"></output>
+    <br /><output id="container-documents"></output>
   </div>
   
 

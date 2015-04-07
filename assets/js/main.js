@@ -1,83 +1,33 @@
 ﻿/**
-
 JW Clark
 
-load XML from file upload, parse it
+load each XML to DOMParser
 
 started at  http://www.html5rocks.com/en/tutorials/file/dndfiles/
 learned a closure - http://stackoverflow.com/questions/12546775/get-filename-after-filereader-asynchronously-loaded-a-file
-
 */
 
 
 var totalDocumentsProcessed = 0;
-var totalDocumentCount = 0;
-var totalWordCount = 0;
-var totalLemmaCount = 0;
+var totalDocumentCount = 0;			//set by `onFilesSelected`
+var totalTokenCount = 0;			//incremented by `incrementTokenCounts`
 var totalSentenceCount = 0;
 var totalSentimentScore = 0;
-var collectDocuments = {};
-var collectLemmas = {};
-var collectWords = {};
-var discardWords = [];
-var discardLemmas = [];
+var mapDocuments = {};
+var mapTokens = {};
+var discardTokens = [];
 
 function reset() {
 	totalDocumentsProcessed = 0;
 	totalDocumentCount = 0;
-	totalWordCount = 0;
-	totalLemmaCount = 0;
+	totalTokenCount = 0;
 	totalSentenceCount = 0;
 	totalSentimentScore = 0;
-	collectDocuments = {};
-	collectLemmas = {};
-	collectWords = {};
-	discardWords = [];
-	discardLemmas = [];
+	mapDocuments = {};
+	mapTokens = {};
+	discardTokens = [];
 	$('output').html('');
 	$('ol').html('');
-}
-
-function print() {
-	var sortable = [];
-	for (var key in collectWords)
-		sortable.push([key, collectWords[key].tfidf]);
-	sortable.sort(function (a, b) { return b[1] - a[1] });
-	console.log(sortable);
-	var lemmaList = $('#lemma-frequency');
-	for (var i = 0; i < sortable.length; i++) {
-		$(lemmaList).append('<li>' + sortable[i][0] + " : " + (sortable[i][1]).toFixed(6) + '</li>');
-	}
-}
-
-function tfidf() {
-	//var lemmaList = $('#lemma-frequency'); 
-	for (var key in collectLemmas) {
-		if (collectLemmas.hasOwnProperty(key)) {
-			var precision = 5;
-			var lemmaCount = collectLemmas[key].value;
-			var numFilesContainingLemma = collectLemmas[key].set.size;
-			var tf = lemmaCount / totalLemmaCount;
-			var idf = Math.log10(totalDocumentCount / numFilesContainingLemma);
-			var tfidf = tf * idf;
-			collectLemmas[key].tfidf = tfidf;
-			//$(lemmaList).append('<li>' + key + ': ' + tf + ' : ' + idf + '</li>');
-		}
-	}
-
-
-	//var wordList = $('#word-frequency');
-	for (var key in collectWords) {
-		if (collectWords.hasOwnProperty(key)) {
-			var wordCount = collectWords[key].value;
-			var numFilesContainingWord = collectWords[key].set.size;
-			var tf = wordCount / totalWordCount;
-			var idf = Math.log10(totalDocumentCount / numFilesContainingWord);
-			var tfidf = tf * idf;
-			collectWords[key].tfidf = tfidf;
-			//$(wordList).append('<li>' + key + ': ' + tf + ' : ' + idf + '</li>');
-		}
-	}
 }
 
 function SentimentFormatException(sentiment) {
@@ -106,97 +56,133 @@ function evaluateSentimentLabelScore(sentimentLabel) {
 	}
 }
 
-function incrementLemmaCounts(lemma, fileKey) {
-	if (lemma.match(/^[0-9a-z]+$/) || lemma.length > 1 || lemma === "i".toUpperCase()) {
-		if (!(lemma in collectLemmas)) {
-			collectLemmas[lemma] = {};
-			collectLemmas[lemma].value = 1;
-			collectLemmas[lemma].set = new Set();
-			collectLemmas[lemma].set.add(fileKey);
-		} else {
-			collectLemmas[lemma].value++;
-			collectLemmas[lemma].set.add(fileKey);
-		}
-		totalLemmaCount++;
+function print() {
+	//sort token list by tfidf
+	var sortable = [];
+	for (var key in mapTokens) {
+		sortable.push([key, mapTokens[key].tfidf]);
 	}
-	else
-		discardLemmas.push(lemma);
-}
+	sortable.sort(function (a, b) { return b[1] - a[1] });
 
-function incrementWordCounts(word, fileKey) {
-	if (word.match(/^[0-9a-z]+$/) || word.length > 1 || word === "i".toUpperCase()) {
-		if (!(word in collectWords)) {
-			collectWords[word] = {};
-			collectWords[word].value = 1;
-			collectWords[word].set = new Set();
-			collectWords[word].set.add(fileKey);
-		} else {
-			collectWords[word].value++;
-			collectWords[word].set.add(fileKey);
-		}
-		totalWordCount++;
+	//print token list
+	var tokenList = $('#token-list');
+	for (var i = 0; i < sortable.length; i++) {
+		$(tokenList).append('<li>' + sortable[i][0] + " : " + (sortable[i][1]).toFixed(6) + '</li>');
 	}
-	else
-		discardWords.push(word);
-}
 
-
-function parseCoreNLPXML() {
-
-	//foreach document
-	for (var fileName in collectDocuments) {
-		if (collectDocuments.hasOwnProperty(fileName)) {
-
-			var parser = new DOMParser();
-			var xml = parser.parseFromString(collectDocuments[fileName], "application/xml");
-			var sentences = xml.getElementsByTagName('sentences')[0].children;
-			var html = '';
-
-			//foreach sentence
-			for (var i = 0; i < sentences.length; i++) {
-				var sentimentScore = parseInt(sentences[i].attributes[1].nodeValue);
-				var sentimentLabel = sentences[i].attributes[2].nodeValue;
-				var tokens = sentences[i].children[0].children;
-
-				//foreach token
-				var tokenSentence = '';
-				for (var k = 0; k < tokens.length; k++) {
-					var iWord = 0;
-					var iLemma = 1;
-					var iPos = 4;
-					var iNer = 5;
-					var iSpeaker = 6;
-					var word = tokens[k].children[iWord].textContent;
-					var lemma = tokens[k].children[iLemma].textContent;
-					incrementWordCounts(word, fileName);
-					incrementLemmaCounts(lemma, fileName);
-					tokenSentence += word + ' ';
-				}
-				totalSentimentScore += evaluateSentimentLabelScore(sentimentLabel);
-				totalSentenceCount++;
-
-				html += '<br><div>' + (i + 1) + ': ' + sentimentLabel + '</div><div>' + tokenSentence + '</div>';
+	//print documents and sentences
+	var html = '';
+	var container = $('#container-documents');
+	for (var key in mapDocuments) {
+		var sentences = mapDocuments[key].sentences;
+		for (var i = 0; i < sentences.length; i++) {
+			var index = sentences[i].index;
+			var label = sentences[i].sentimentLabel;
+			var tokens = sentences[i].tokens;
+			html += '<div>' + index + ': ' + label + '</div><div>';
+			for (var k = 0; k < tokens.length; k++) {
+				html += tokens[k].word + ' ';
 			}
-			var containerDocument = '<div id="' + fileName + '">' + html + '</div><br><hr>';
-			$('#totalSentimentScore').html('<b>Total Sentiment Score:</b> ' + totalSentimentScore);
-			$('#totalWordCount').html('<b>Word Count:</b> ' + totalWordCount);
-			$('#totalLemmaCount').html('<b>Lemma Count:</b> ' + totalLemmaCount);
-			$('#totalSentences').html('<b>Sentences:</b> ' + totalSentenceCount);
-			$('#container-documents').append(containerDocument);
+			html += '</div><br>';
 		}
+		html += '<hr>';
 	}
-
-	tfidf();
-	print();
-
-	$('#display').show();
-	console.log(discardWords);
-	console.log(discardLemmas);
-	console.log(collectWords);
+	$(container).html(html);
 }
 
+function tfidf() {
+	for (var key in mapTokens) {
+		var thisTokenCount = mapTokens[key].value;
+		var numFilesWithToken = mapTokens[key].set.size;
+		var tf = thisTokenCount / totalTokenCount;
+		var idf = Math.log10(totalDocumentCount / numFilesWithToken);
+		mapTokens[key].tf = tf;
+		mapTokens[key].idf = idf;
+		mapTokens[key].tfidf = tf * idf;
+	}
+	console.log("tfidf: " + mapTokens);
+}
 
-function handleFileSelect(event) {
+function incrementTokenCounts(token) {
+	var target = token.word;
+	//alphanumeric, length > 1, not I
+	if ((target.match(/^[0-9a-z]+$/) && target.length > 1) || target === "i".toUpperCase()) {
+		if (!(target in mapTokens)) {
+			//create a new token
+			mapTokens[target] = {};
+			mapTokens[target].value = 1;
+			mapTokens[target].set = new Set();
+			mapTokens[target].set.add(token.documentId);
+		} else {
+			//increment and existing token
+			mapTokens[target].value++;
+			mapTokens[target].set.add(token.documentId);
+		}
+		totalTokenCount++;
+	} else {
+		discardTokens.push(target);
+	}
+}
+
+function parseTokens(sentence) {
+	var data = []; //temp array
+	var iWord = 0, iLemma = 1, iPos = 4, iNer = 5, iSpeaker = 6; //indexes
+	var tokens = sentence.xml.children[0].children;
+	for (var i = 0; i < tokens.length; i++) {
+		var token = {};
+		token.index = i;
+		token.sentenceIndex = sentence.index;
+		token.documentId = sentence.documentId;
+		token.word = tokens[i].children[iWord].textContent;
+		token.lemma = tokens[i].children[iLemma].textContent;
+		token.pos = tokens[i].children[iPos].textContent;
+		//ignore stop words
+		if (!isStopWord(token.word))
+			incrementTokenCounts(token);
+		data.push(token);
+	}
+	return data;
+}
+
+function parseSentences(document) {
+	var data = []; //temp array
+	var sentenceXML = document.xml.getElementsByTagName('sentences')[0].children;
+	for (var i = 0; i < sentenceXML.length; i++) {
+		var sentence = {};
+		sentence.index = i;
+		sentence.documentId = document.id;
+		sentence.xml = sentenceXML[i];
+		sentence.sentimentScore = parseInt(sentenceXML[i].attributes[1].nodeValue);
+		sentence.sentimentLabel = sentenceXML[i].attributes[2].nodeValue;
+		sentence.tokens = parseTokens(sentence);
+		data.push(sentence);
+	}
+	return data;
+}
+
+function parseXML(evt, file) {
+	var key = file.name;
+	var value = evt.target.result;
+	var parser = new DOMParser();
+	var xml = parser.parseFromString(value, "application/xml")
+	var document = {};
+	document.id = key;
+	document.xml = xml;
+	document.sentences = parseSentences(document);
+
+	mapDocuments[key] = document;
+
+	if (++totalDocumentsProcessed === totalDocumentCount) {
+		tfidf();
+		print();
+		/* should probably treat sentences as documents when there is only one file available
+		 * else all tfidf values will be 0: log10(1/1)
+		 * if (totalDocumentCount === 1) { } */
+	}
+	console.log(mapDocuments[key]);
+}
+
+function onFilesSelected(event) {
 	reset();
 	var files = event.target.files; // FileList object
 	totalDocumentCount = files.length;
@@ -204,17 +190,199 @@ function handleFileSelect(event) {
 		var fileReader = new FileReader();
 		fileReader.onloadend = (function (file) {
 			return function (evt) {
-				collectDocument(evt, file)
+				parseXML(evt, file)
 			}
 		})(f);
 		fileReader.readAsText(f);
 	}
+	console.log("discard: " + discardTokens);
 }
 
-function collectDocument(evt, file) {
-	collectDocuments[file.name] = evt.target.result;
-	if (++totalDocumentsProcessed === totalDocumentCount)
-		parseCoreNLPXML();
-}
+document.getElementById('files').addEventListener('change', onFilesSelected, false);
 
-document.getElementById('files').addEventListener('change', handleFileSelect, false);
+
+function isStopWord(token) {
+	//http://www.ranks.nl/stopwords
+	//maybe transpose this in excel then paste it back here
+	//http://www.extendoffice.com/documents/excel/681-excel-change-columns-to-rows.html
+	var stopWords = [
+		"a",
+		"about",
+		"above",
+		"after",
+		"again",
+		"against",
+		"all",
+		"am",
+		"an",
+		"and",
+		"any",
+		"are",
+		"aren't",
+		"as",
+		"at",
+		"be",
+		"because",
+		"been",
+		"before",
+		"being",
+		"below",
+		"between",
+		"both",
+		"but",
+		"by",
+		"can't",
+		"cannot",
+		"could",
+		"couldn't",
+		"did",
+		"didn't",
+		"do",
+		"does",
+		"doesn't",
+		"doing",
+		"don't",
+		"down",
+		"during",
+		"each",
+		"few",
+		"for",
+		"from",
+		"further",
+		"had",
+		"hadn't",
+		"has",
+		"hasn't",
+		"have",
+		"haven't",
+		"having",
+		"he",
+		"he'd",
+		"he'll",
+		"he's",
+		"her",
+		"here",
+		"here's",
+		"hers",
+		"herself",
+		"him",
+		"himself",
+		"his",
+		"how",
+		"how's",
+		"i",
+		"i'd",
+		"i'll",
+		"i'm",
+		"i've",
+		"if",
+		"in",
+		"into",
+		"is",
+		"isn't",
+		"it",
+		"it's",
+		"its",
+		"itself",
+		"let's",
+		"me",
+		"more",
+		"most",
+		"mustn't",
+		"my",
+		"myself",
+		"no",
+		"nor",
+		"not",
+		"of",
+		"off",
+		"on",
+		"once",
+		"only",
+		"or",
+		"other",
+		"ought",
+		"our",
+		"ours",
+		"ourselves",
+		"out",
+		"over",
+		"own",
+		"same",
+		"shan't",
+		"she",
+		"she'd",
+		"she'll",
+		"she's",
+		"should",
+		"shouldn't",
+		"so",
+		"some",
+		"such",
+		"than",
+		"that",
+		"that's",
+		"the",
+		"their",
+		"theirs",
+		"them",
+		"themselves",
+		"then",
+		"there",
+		"there's",
+		"these",
+		"they",
+		"they'd",
+		"they'll",
+		"they're",
+		"they've",
+		"this",
+		"those",
+		"through",
+		"to",
+		"too",
+		"under",
+		"until",
+		"up",
+		"very",
+		"was",
+		"wasn't",
+		"we",
+		"we'd",
+		"we'll",
+		"we're",
+		"we've",
+		"were",
+		"weren't",
+		"what",
+		"what's",
+		"when",
+		"when's",
+		"where",
+		"where's",
+		"which",
+		"while",
+		"who",
+		"who's",
+		"whom",
+		"why",
+		"why's",
+		"with",
+		"won't",
+		"would",
+		"wouldn't",
+		"you",
+		"you'd",
+		"you'll",
+		"you're",
+		"you've",
+		"your",
+		"yours",
+		"yourself",
+		"yourselves"
+	];
+	if(stopWords.indexOf(token) > -1)
+		return true;	
+	else
+		return false;
+}

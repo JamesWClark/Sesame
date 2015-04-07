@@ -1,13 +1,13 @@
 ﻿body {
 }
-#display {
+#button-bar {
 	display: none;
 }
-#current-document {
+input#current-document {
 	width: 15px;
 	text-align: center;
 }
-ol.term-list {
+#token-list {
 	display: inline-block;
 	padding-right: 10px;
 	float: left;

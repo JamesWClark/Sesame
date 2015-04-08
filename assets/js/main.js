@@ -2,6 +2,14 @@
 JW Clark
 
 load each XML to DOMParser
+---
+onLoadFiles
+reset
+parseXML
+parseSentences
+parseTokens
+tfidf
+print
 
 started at  http://www.html5rocks.com/en/tutorials/file/dndfiles/
 learned a closure - http://stackoverflow.com/questions/12546775/get-filename-after-filereader-asynchronously-loaded-a-file
@@ -62,15 +70,15 @@ function print() {
 	for (var key in mapTokens) {
 		sortable.push([key, mapTokens[key].tfidf]);
 	}
-	sortable.sort(function (a, b) { return b[1] - a[1] });
+	sortable.sort(function (a, b) { return b[1] - a[1] }); //max to min
 
-	//print token list
+	//print sorted token tfidf list
 	var tokenList = $('#token-list');
 	for (var i = 0; i < sortable.length; i++) {
 		$(tokenList).append('<li>' + sortable[i][0] + " : " + (sortable[i][1]).toFixed(6) + '</li>');
 	}
 
-	//print documents and sentences
+	//print documents and sentences one token at at time
 	var html = '';
 	var container = $('#container-documents');
 	for (var key in mapDocuments) {
@@ -81,7 +89,18 @@ function print() {
 			var tokens = sentences[i].tokens;
 			html += '<div>' + index + ': ' + label + '</div><div>';
 			for (var k = 0; k < tokens.length; k++) {
-				html += tokens[k].word + ' ';
+				html += '<span ';
+				var word = tokens[k].word;
+				var tfidf = '';
+				if (word in mapTokens) {
+					tfidf = mapTokens[word].tfidf;
+					var colorScale = Math.floor(100 * tfidf * 255);
+					var yellow = rgb(colorScale, colorScale, 0); //scale to a shadow of yellow out of max 255 inverted
+					var red = rgb(colorScale, 0, 0);
+					html += 'style = "border-radius: 3px; padding: 1px 3px 1px 2px; color: white; background-color: ' + red + '"';
+				}
+				var pos = tokens[k].pos;
+				html += 'title="' + pos + ': ' + tfidf + '" data-tfidf="' + tfidf + '" data-pos="' + pos + '">' + word + '</span>&nbsp;';
 			}
 			html += '</div><br>';
 		}
@@ -200,6 +219,9 @@ function onFilesSelected(event) {
 
 document.getElementById('files').addEventListener('change', onFilesSelected, false);
 
+function rgb(r, g, b) {
+	return "rgb(" + r + "," + g + "," + b + ")";
+}
 
 function isStopWord(token) {
 	//http://www.ranks.nl/stopwords

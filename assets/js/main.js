@@ -107,6 +107,11 @@ function print() {
 		html += '<hr>';
 	}
 	$(container).html(html);
+	$('#totalDocumentCount').html('<b>Documents</b>: ' + totalDocumentCount);
+	$('#totalDiscardedTokens').html('<b>Discarded Tokens</b>: ' + discardTokens.length);
+	$('#totalUniqueTokensCount').html('<b>Unique Tokens</b>: ' + Object.keys(mapTokens).length);
+	$('#totalTokenCount').html('<b>Total Tokens</b>: ' + totalTokenCount);
+	console.log('discarded: ' + discardTokens);
 }
 
 function tfidf() {
@@ -214,7 +219,6 @@ function onFilesSelected(event) {
 		})(f);
 		fileReader.readAsText(f);
 	}
-	console.log("discard: " + discardTokens);
 }
 
 document.getElementById('files').addEventListener('change', onFilesSelected, false);

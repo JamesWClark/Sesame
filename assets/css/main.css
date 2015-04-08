@@ -8,7 +8,12 @@ input#current-document {
 	text-align: center;
 }
 #token-list {
-	display: inline-block;
 	padding-right: 10px;
-	float: left;
+}
+#data {
+	width: 78%;
+}
+.inline-block {
+	display: inline-block;
+	vertical-align: top;
 }

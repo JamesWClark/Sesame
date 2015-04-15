@@ -8,7 +8,6 @@ input#current-document {
 	display: none;
 }
 #token-list {
-	display: inline-block;
 	padding-right: 10px;
 	float: left;
 }
@@ -27,3 +26,11 @@ input#current-document {
 	display: inline;
 	padding: 7px;
 }
+#data {
+	width: 78%;
+}
+.inline-block {
+	display: inline-block;
+	vertical-align: top;
+}
+

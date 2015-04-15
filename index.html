@@ -28,12 +28,16 @@
   <div id="button-bar">
     <button> &lt; </button> <input id="current-document" type="text" style="width: 15px;" /> / <span id="totalDocuments"></span> <button> &gt; </button>
   </div>
-  <div id="data">
-    <ol class="term-list" id="token-list"></ol>
+  <div class="inline-block">
+    <ol id="token-list"></ol>
+  </div>
+  <div class="inline-block" id="data">
     <br /><output id="totalSentimentScore"></output>
-    <br /><output id="totalWordCount"></output>
-    <br /><output id="totalLemmaCount"></output>
-    <br /><output id="totalSentences"></output>
+    <br /><output id="totalDocumentCount"></output>
+    <br /><output id="totalDiscardedTokens"></output>
+    <br /><output id="totalUniqueTokensCount"></output>
+    <br /><output id="totalTokenCount"></output>
+    <br />
     <br /><output id="container-documents"></output>
   </div>
   

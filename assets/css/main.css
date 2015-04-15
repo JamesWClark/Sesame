@@ -1,14 +1,29 @@
 ﻿body {
 }
-#button-bar {
-	display: none;
-}
 input#current-document {
 	width: 15px;
 	text-align: center;
+}
+#button-bar {
+	display: none;
 }
 #token-list {
 	display: inline-block;
 	padding-right: 10px;
 	float: left;
+}
+#settings label {
+	width: 200px;
+}
+#tfidf-threshold {
+	-webkit-transform: rotate(90deg);
+	width: 100%;
+}
+#container-slider {
+	display: inline-block;
+	width: 75px;
+}
+.inline {
+	display: inline;
+	padding: 7px;
 }

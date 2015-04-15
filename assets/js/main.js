@@ -15,7 +15,11 @@ started at  http://www.html5rocks.com/en/tutorials/file/dndfiles/
 learned a closure - http://stackoverflow.com/questions/12546775/get-filename-after-filereader-asynchronously-loaded-a-file
 */
 
+//preferences
+var preferredTfidfToken;
+var preferredTfidfThreshold;
 
+//internals
 var totalDocumentsProcessed = 0;
 var totalDocumentCount = 0;			//set by `onFilesSelected`
 var totalTokenCount = 0;			//incremented by `incrementTokenCounts`
@@ -24,6 +28,11 @@ var totalSentimentScore = 0;
 var mapDocuments = {};
 var mapTokens = {};
 var discardTokens = [];
+
+function setup() {
+	preferredTfidfToken = $('input[name=tfidf-word-v-lemma]:checked').val();
+	preferredTfidfThreshold = $('input[name=tfidf-threshold]').val();
+}
 
 function reset() {
 	totalDocumentsProcessed = 0;
@@ -90,16 +99,17 @@ function print() {
 			html += '<div>' + index + ': ' + label + '</div><div>';
 			for (var k = 0; k < tokens.length; k++) {
 				html += '<span ';
+				var lemma = tokens[k].lemma;
 				var word = tokens[k].word;
+				var pos = tokens[k].pos;
 				var tfidf = '';
-				if (word in mapTokens) {
-					tfidf = mapTokens[word].tfidf;
+				if (lemma in mapTokens) {
+					tfidf = mapTokens[lemma].tfidf;
 					var colorScale = Math.floor(100 * tfidf * 255);
 					var yellow = rgb(colorScale, colorScale, 0); //scale to a shadow of yellow out of max 255 inverted
 					var red = rgb(colorScale, 0, 0);
 					html += 'style = "border-radius: 3px; padding: 1px 3px 1px 2px; color: white; background-color: ' + red + '"';
 				}
-				var pos = tokens[k].pos;
 				html += 'title="' + pos + ': ' + tfidf + '" data-tfidf="' + tfidf + '" data-pos="' + pos + '">' + word + '</span>&nbsp;';
 			}
 			html += '</div><br>';
@@ -123,7 +133,7 @@ function tfidf() {
 }
 
 function incrementTokenCounts(token) {
-	var target = token.word;
+	var target = token.lemma; //dependency: in print [var word = tokens[k].lemma;]
 	//alphanumeric, length > 1, not I
 	if ((target.match(/^[0-9a-z]+$/) && target.length > 1) || target === "i".toUpperCase()) {
 		if (!(target in mapTokens)) {
@@ -203,6 +213,7 @@ function parseXML(evt, file) {
 
 function onFilesSelected(event) {
 	reset();
+	setup();
 	var files = event.target.files; // FileList object
 	totalDocumentCount = files.length;
 	for (var i = 0, f; f = files[i]; i++) {
@@ -217,7 +228,20 @@ function onFilesSelected(event) {
 	console.log("discard: " + discardTokens);
 }
 
-document.getElementById('files').addEventListener('change', onFilesSelected, false);
+
+$(document).ready(addEventListeners);
+
+function addEventListeners() {
+	document.getElementById('files').addEventListener('change', onFilesSelected, false);
+
+	var label = $('#tfidf-threshold-value');
+	$("#tfidf-threshold").mousemove(function (e) {
+		$(label).text($(this).value);
+	});
+}
+
+
+/* UTILITY METHODS */
 
 function rgb(r, g, b) {
 	return "rgb(" + r + "," + g + "," + b + ")";

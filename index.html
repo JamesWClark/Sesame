@@ -11,6 +11,18 @@
 <body>
   <input type="file" id="files" name="files[]" multiple />
   <hr />
+  <fieldset style="display: none;">
+    <legend>TFIDF</legend>
+      <div id="container-slider">
+        <label for="tfidf-threshold">Threshold</label>
+        <input id="tfidf-threshold" type="range"><br />
+        <span id="tfidf-threshold-value"></span>
+      </div>
+      <label for="tfidf-word-v-lemma">Use these tokens for TFIDF calculation:</label><br />
+      <input type="radio" name="tfidf-word-v-lemma" value="lemma" checked="checked" />lemmas<br />
+      <input type="radio" name="tfidf-word-v-lemma" value="word" />words<br />
+  </fieldset>
+  <br />
 
 
   <div id="button-bar">

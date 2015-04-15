@@ -15,9 +15,14 @@ started at  http://www.html5rocks.com/en/tutorials/file/dndfiles/
 learned a closure - http://stackoverflow.com/questions/12546775/get-filename-after-filereader-asynchronously-loaded-a-file
 */
 
+//array of files, set by 'onFilesSelected'
+var files;
+
 //preferences
 var preferredTfidfToken;
 var preferredTfidfThreshold;
+var preferredTf;
+var preferredIdf;
 
 //internals
 var totalDocumentsProcessed = 0;
@@ -30,8 +35,10 @@ var mapTokens = {};
 var discardTokens = [];
 
 function setup() {
-	preferredTfidfToken = $('input[name=tfidf-word-v-lemma]:checked').val();
 	preferredTfidfThreshold = $('input[name=tfidf-threshold]').val();
+	preferredTfidfToken = $('input[name=tfidf-word-v-lemma]:checked').val();
+	preferredTf = $('input[name=tfidf-tf]:checked').val();
+	preferredIdf = $('input[name=tfidf-idf]:checked').val();
 }
 
 function reset() {
@@ -45,32 +52,6 @@ function reset() {
 	discardTokens = [];
 	$('output').html('');
 	$('ol').html('');
-}
-
-function SentimentFormatException(sentiment) {
-	this.value = sentiment;
-	this.message = "Unhandled sentiment expression";
-	this.toString = function () {
-		return this.value + " : " + this.message;
-	};
-}
-
-function evaluateSentimentLabelScore(sentimentLabel) {
-	switch (sentimentLabel) {
-		case "Verypositive":
-			return 2;
-		case "Positive":
-			return 1;
-		case "Neutral":
-			return 0;
-		case "Negative":
-			return -1;
-		case "Verynegative":
-			return -2;
-		default:
-			throw new SentimentFormatException(sentimentLabel);
-			break;
-	}
 }
 
 function print() {
@@ -128,8 +109,10 @@ function tfidf() {
 	for (var key in mapTokens) {
 		var thisTokenCount = mapTokens[key].value;
 		var numFilesWithToken = mapTokens[key].set.size;
-		var tf = thisTokenCount / totalTokenCount;
+		var tf = thisTokenCount / totalTokenCount; //raw term frequency
 		var idf = Math.log10(totalDocumentCount / numFilesWithToken);
+		if (preferredTf === 'normalized')
+			tf = 1 + Math.log10(tf);
 		mapTokens[key].tf = tf;
 		mapTokens[key].idf = idf;
 		mapTokens[key].tfidf = tf * idf;
@@ -216,10 +199,9 @@ function parseXML(evt, file) {
 	console.log(mapDocuments[key]);
 }
 
-function onFilesSelected(event) {
+function calculateAll() {
 	reset();
 	setup();
-	var files = event.target.files; // FileList object
 	totalDocumentCount = files.length;
 	for (var i = 0, f; f = files[i]; i++) {
 		var fileReader = new FileReader();
@@ -232,8 +214,16 @@ function onFilesSelected(event) {
 	}
 }
 
+function onFilesSelected(event) {
+	files = event.target.files; // FileList object
+	calculateAll();
+}
+
 
 $(document).ready(addEventListeners);
+
+
+/* UTILITY METHODS */
 
 function addEventListeners() {
 	document.getElementById('files').addEventListener('change', onFilesSelected, false);
@@ -244,8 +234,31 @@ function addEventListeners() {
 	});
 }
 
+function SentimentFormatException(sentiment) {
+	this.value = sentiment;
+	this.message = "Unhandled sentiment expression";
+	this.toString = function () {
+		return this.value + " : " + this.message;
+	};
+}
 
-/* UTILITY METHODS */
+function evaluateSentimentLabelScore(sentimentLabel) {
+	switch (sentimentLabel) {
+		case "Verypositive":
+			return 2;
+		case "Positive":
+			return 1;
+		case "Neutral":
+			return 0;
+		case "Negative":
+			return -1;
+		case "Verynegative":
+			return -2;
+		default:
+			throw new SentimentFormatException(sentimentLabel);
+			break;
+	}
+}
 
 function rgb(r, g, b) {
 	return "rgb(" + r + "," + g + "," + b + ")";

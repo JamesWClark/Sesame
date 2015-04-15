@@ -11,16 +11,26 @@
 <body>
   <input type="file" id="files" name="files[]" multiple />
   <hr />
-  <fieldset style="display: none;">
+  <fieldset id="fieldset-tfidf" class="settings">
     <legend>TFIDF</legend>
-      <div id="container-slider">
-        <label for="tfidf-threshold">Threshold</label>
-        <input id="tfidf-threshold" type="range"><br />
-        <span id="tfidf-threshold-value"></span>
-      </div>
-      <label for="tfidf-word-v-lemma">Use these tokens for TFIDF calculation:</label><br />
-      <input type="radio" name="tfidf-word-v-lemma" value="lemma" checked="checked" />lemmas<br />
-      <input type="radio" name="tfidf-word-v-lemma" value="word" />words<br />
+    <label for="tfidf-threshold">Threshold</label>
+    <input type="text" name="tfidf-threshold" id="tfidf-threshold" value="0.003" /><br />
+    <br />
+    <label for="tfidf-word-v-lemma">Use these tokens for TFIDF calculation:</label><br />
+    <input type="radio" name="tfidf-word-v-lemma" value="lemma" checked="checked" />lemmas<br />
+    <input type="radio" name="tfidf-word-v-lemma" value="word" />words<br />
+    <br />
+    <fieldset>
+      <legend>TF</legend>
+      <input type="radio" name="tfidf-tf" value="raw"/>raw frequency: f<sub>t,d</sub><br />
+      <input type="radio" name="tfidf-tf" value="normalized" checked="checked" />log normalization: 1 + log f<sub>t,d</sub><br />
+    </fieldset>
+    <fieldset>
+      <legend>IDF</legend>
+      <input type="radio" name="tfidf-idf" value="inverse-frequency" checked="checked" />inverse frequency: log(N/n<sub>t</sub>)<br />
+    </fieldset>
+    <br />
+    <button onclick="calculateAll();">Recalculate</button>
   </fieldset>
   <br />
 

@@ -7,16 +7,16 @@ input#current-document {
 #button-bar {
 	display: none;
 }
+input#tfidf-threshold {
+	width: 75px;
+}
 #token-list {
 	padding-right: 10px;
 	float: left;
 }
-#settings label {
-	width: 200px;
-}
-#tfidf-threshold {
-	-webkit-transform: rotate(90deg);
-	width: 100%;
+#fieldset-tfidf {
+	display: inline;
+	padding: 7px;
 }
 #container-slider {
 	display: inline-block;

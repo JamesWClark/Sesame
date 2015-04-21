@@ -22,8 +22,11 @@
     <br />
     <fieldset>
       <legend>TF</legend>
-      <input type="radio" name="tfidf-tf" value="raw"/>raw frequency: f<sub>t,d</sub><br />
-      <input type="radio" name="tfidf-tf" value="normalized" checked="checked" />log normalization: 1 + log f<sub>t,d</sub><br />
+      <input type="radio" name="tfidf-tf" value="natural" />natural: tf<sub>t,d</sub><br />
+      <input type="radio" name="tfidf-tf" value="logarithm" checked="checked" />logarithm: 1 + log(tf<sub>t,d</sub>)<br />
+      <input type="radio" name="tfidf-tf" value="augmented" />augmented: 0.5 + (0.5 * tf<sub>t,d</sub>) / (max<sub>t</sub>(tf<sub>t,d</sub>))<br />
+      <input type="radio" name="tfidf-tf" value="boolean" />boolean: {1 if tf<sub>t,d</sub> > 0; 0 otherwise }<br />
+      <input type="radio" name="tfidf-tf" value="logave" />log ave: (1 + log(tf<sub>t,d</sub>)) / (1 + log(avg<sub>t&isin;d</sub>(tf<sub>t,d</sub>))<br />
     </fieldset>
     <fieldset>
       <legend>IDF</legend>

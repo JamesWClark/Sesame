@@ -33,6 +33,7 @@ var totalSentimentScore = 0;
 var mapDocuments = {};
 var mapTokens = {};
 var discardTokens = [];
+var sortedFinalTokens = [];
 
 function setup() {
 	preferredTfidfThreshold = $('input[name=tfidf-threshold]').val();
@@ -106,17 +107,65 @@ function print() {
 }
 
 function tfidf() {
+	
+	var maxT = -1; //in augmented tfidf, maxT is the highest term frequency by which all other terms are divided
+	var avgT = 0; //average score of tokens that exist in documents
+	var count = 0; //a counter for calculating the average
 	for (var key in mapTokens) {
 		var thisTokenCount = mapTokens[key].value;
 		var numFilesWithToken = mapTokens[key].set.size;
 		var tf = thisTokenCount / totalTokenCount; //raw term frequency
 		var idf = Math.log10(totalDocumentCount / numFilesWithToken);
-		if (preferredTf === 'normalized')
-			tf = 1 + Math.log10(tf);
+		if (tf > maxT)
+			maxT = tf;
+		switch (preferredIdf) {
+			case 'logarithm':
+				tf = Math.abs(1 + Math.log10(tf));
+				break;
+			case 'boolean':
+				if (tf > 0)
+					tf = 1;
+				else
+					tf = 0;
+				break;
+			case 'augmented':
+			case 'logave':
+				//these require calculating and sorting the tf before calculating, increasing the complexity to n^2
+				break;
+			case 'natural':
+			default:
+				//uses raw tf
+				break;
+		}
+		mapTokens[key].tf = tf;
+		mapTokens[key].idf = idf;
+		mapTokens[key].tfidf = tf * idf;
+		avgT += tf;
+		count++;
+	}
+
+	avgT = avgT / count;
+
+	//for more complex calculations (augmented and logave), requires another pass through
+	for (var key in mapTokens) {
+		var tf = mapTokens[key].tf;
+		var idf = mapTokens[key].idf;
+		switch (preferredIdf) {
+			case 'augmented':
+				tf = 0.5 + ((0.5 * tf) / (maxT)); 
+				break;
+			case 'logave':
+				tf = (1 + Math.log10) / (1 + Math.log10(avgT));
+				break;
+			default:
+				//do nothing this time
+				break;
+		}
 		mapTokens[key].tf = tf;
 		mapTokens[key].idf = idf;
 		mapTokens[key].tfidf = tf * idf;
 	}
+
 	console.log("tfidf: " + mapTokens);
 }
 
@@ -181,7 +230,7 @@ function parseXML(evt, file) {
 	var key = file.name;
 	var value = evt.target.result;
 	var parser = new DOMParser();
-	var xml = parser.parseFromString(value, "application/xml")
+	var xml = parser.parseFromString(value, "application/xml");
 	var document = {};
 	document.id = key;
 	document.xml = xml;

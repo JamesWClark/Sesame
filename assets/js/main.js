@@ -111,6 +111,7 @@ function tfidf() {
 	var maxT = -1; //in augmented tfidf, maxT is the highest term frequency by which all other terms are divided
 	var avgT = 0; //average score of tokens that exist in documents
 	var count = 0; //a counter for calculating the average
+
 	for (var key in mapTokens) {
 		var thisTokenCount = mapTokens[key].value;
 		var numFilesWithToken = mapTokens[key].set.size;
@@ -118,23 +119,28 @@ function tfidf() {
 		var idf = Math.log10(totalDocumentCount / numFilesWithToken);
 		if (tf > maxT)
 			maxT = tf;
-		switch (preferredIdf) {
-			case 'logarithm':
-				tf = Math.abs(1 + Math.log10(tf));
-				break;
+
+		switch (preferredTf) {
 			case 'boolean':
 				if (tf > 0)
 					tf = 1;
 				else
 					tf = 0;
 				break;
-			case 'augmented':
-			case 'logave':
-				//these require calculating and sorting the tf before calculating, increasing the complexity to n^2
-				break;
 			case 'natural':
+				//do nothing - use the raw from above
+				break;
+			case 'logarithm':
+				tf = Math.abs(1 + Math.log10(tf));
+				break;
+			case 'augmented':
+				//requires calculating all tf for max, will continue in another loop below
+				break;
+			case 'logave':
+				//requires calculating all tf for avg, will continue in another loop below
+				break;
 			default:
-				//uses raw tf
+				//do nothing - use the raw from above
 				break;
 		}
 		mapTokens[key].tf = tf;
@@ -144,29 +150,33 @@ function tfidf() {
 		count++;
 	}
 
+	//sum of scores divided by total tokens
 	avgT = avgT / count;
 
 	//for more complex calculations (augmented and logave), requires another pass through
-	for (var key in mapTokens) {
-		var tf = mapTokens[key].tf;
-		var idf = mapTokens[key].idf;
-		switch (preferredIdf) {
-			case 'augmented':
-				tf = 0.5 + ((0.5 * tf) / (maxT)); 
-				break;
-			case 'logave':
-				tf = (1 + Math.log10) / (1 + Math.log10(avgT));
-				break;
-			default:
-				//do nothing this time
-				break;
+	if (preferredTf === 'augmented' || preferredTf === 'logave') {
+		for (var key in mapTokens) {
+			var tf = mapTokens[key].tf;
+			var idf = mapTokens[key].idf;
+			switch (preferredTf) {
+				case 'augmented':
+					tf = 0.5 + ((0.5 * tf) / (maxT));
+					break;
+				case 'logave':
+					tf = (1 + Math.log10(tf)) / (1 + Math.log10(avgT));
+					break;
+				default:
+					//do nothing this time
+					break;
+			}
+			mapTokens[key].tf = tf;
+			mapTokens[key].idf = idf;
+			mapTokens[key].tfidf = tf * idf;
 		}
-		mapTokens[key].tf = tf;
-		mapTokens[key].idf = idf;
-		mapTokens[key].tfidf = tf * idf;
 	}
-
-	console.log("tfidf: " + mapTokens);
+	console.log("tfidf: ");
+	console.log(mapTokens);
+	console.log("avgT: " + avgT);
 }
 
 function incrementTokenCounts(token) {
@@ -313,6 +323,7 @@ function rgb(r, g, b) {
 	return "rgb(" + r + "," + g + "," + b + ")";
 }
 
+//a better way to manage this function is to load the words into key value pairs of an associative array for instant lookup every time a stop word needs to be compared
 function isStopWord(token) {
 	//http://www.ranks.nl/stopwords
 	//maybe transpose this in excel then paste it back here

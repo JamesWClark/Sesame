@@ -1,99 +1,140 @@
+/**
+ * QUERY EXAMPLES
+ * https://github.com/mongodb/mongo-java-driver/blob/master/driver/src/examples/primer/QueryPrimer.java
+ * 
+ * JSON EXAMPLE
+ * http://www.jsonmate.com/permalink/55469b30aa522bae3683ee2c
+ * 
+ * import static com.mongodb.client.model.Filters.*;
+ */
+
 package open.sesame;
 
-import java.io.IOException;
-import java.util.Scanner;
+import static com.mongodb.client.model.Filters.eq;
 
-import open.sesame.opennlp.Models;
-import open.sesame.opennlp.NLPFactory;
-import opennlp.tools.coref.DiscourseEntity;
+import java.util.ArrayList;
+
+import org.bson.Document;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.mongodb.BasicDBObject;
+import com.mongodb.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.MongoDatabase;
 
 public class Main {
+
+	private static final MongoClient mongo = new MongoClient();
+	private static final MongoDatabase db = mongo.getDatabase("yelp");
+	private static final MongoCollection<Document> locations = db.getCollection("locations");
+	private static final MongoCollection<Document> reviews = db.getCollection("reviews");
+	private static final MongoCollection<Document> corenlp = db.getCollection("corenlp");
 	
-	public static final String WORDNET_PATH = "C:/Program Files (x86)/WordNet/3.0/dict";
-
-	private static Scanner scanner = null;		
-
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) {
 		
-
-		/*
-		//let args[0] = path to input file
-		if(args.length > 0) {
-			String inputPath = args[0];
-			System.out.println("Attempting to read from: " + args[0]);
-			new TSVWriter(new File(inputPath));
-		} else {
-			new SwingGUI();
-		}
-		*/
-		/* COREF */
-		String sentence = "Pierre Vinken, 61 years old, will join the board as a nonexecutive director Nov. 29.";
-
-		DiscourseEntity entity = NLPFactory.coref(sentence, Models.COREFERENCE)[0];
-		System.out.println(entity.toString());
+		//can foreach on categories, but let's stay simple with sandwiches or other for now
+		String category = "Sandwiches";
+		
+		ArrayList<String> categories = getDistinctLocationCategories();
+		ArrayList<String> businessIds = getBusinessIdList(category);
+		ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
 		
 		
+		tfidf(reviewIds);
 		
-		/* PARSER
-		//where is the document analyzer model ???
-		String modelPath = MODELS_DIRECTORY + "en-parser-chunking.bin";
-		String inputText = args[0];
-		*/
 
-		/* doc level analysis requires models we do not yet have - maybe we need to train them
-		DocumentCategorizerME myCategorizer = new DocumentCategorierME(m);
-		double[] outcomes = myCategorizer.categorize(inputText);
-		String category = myCategorizer.getBestOutcome();
-		*?
+		mongo.close();
+	}
+	
+	/**
+	 * Start a TFIDF process on the corenlp result set
+	 * @param reviewIdList a list of review IDs from the reviews collection
+	 */
+	static void tfidf(ArrayList<String> reviewIdList) {
+		System.out.print("get review nlp: ");
+		BasicDBObject filter = new BasicDBObject("$in", reviewIdList);
+		BasicDBObject query = new BasicDBObject("root.document.review_id", filter);
+		long start = System.currentTimeMillis();
+		MongoCursor<Document> cursor = corenlp.find(query).iterator();
+		Document corejson = cursor.next();
+		String json = corejson.toJson();
 		
-		
-		//String modelPath = MODELS_DIRECTORY + "en-parser-chunking.bin";
-		//System.out.println(NLPFactory.parse(args[0], modelPath));
-
-		/* WORDNET
-		WordNet wordnet = new WordNet(WORDNET_PATH);
-		String word = "therapy";
-		POS pos = POS.NOUN;
-		for(String s : wordnet.getStems(word, pos)) {
-			System.out.println(s);
-			IWord iword = wordnet.getIWord(s, pos);
-			for(IWordID id : iword.getRelatedWords()) {
-				System.out.print(wordnet.getWord(id).getLemma() + ", ");
+		JsonParser parser = new JsonParser();
+		JsonObject root = parser.parse(json).getAsJsonObject().get("root").getAsJsonObject();
+		JsonObject document = root.get("document").getAsJsonObject();
+		JsonObject sentences = document.get("sentences").getAsJsonObject();
+		JsonArray sentence = sentences.get("sentence").getAsJsonArray();
+		for(int i = 0; i < sentence.size(); i++) {
+			JsonObject sentenceIndex = sentence.get(i).getAsJsonObject();
+			JsonObject tokens = sentenceIndex.get("tokens").getAsJsonObject();
+			JsonArray token = tokens.get("token").getAsJsonArray();
+			for(int k = 0; k < token.size(); k++) {
+				JsonObject tokenIndex = token.get(k).getAsJsonObject();
+				String pos = tokenIndex.get("POS").getAsString();
+				String lemma = tokenIndex.get("lemma").getAsString();
+				String word = tokenIndex.get("word").getAsString();
+				System.out.println(word + " - " + lemma + " - " + pos);
 			}
-			System.out.println(iword.getLemma());	
 		}
-		
-		
-		/*
-		List<String> stems = wordnet.getStems("cleaned", POS.VERB);
-
-		for(String s : stems) {
-			System.out.println(s);
+		long finish = System.currentTimeMillis();
+		System.out.println("elapsed " + (finish - start) + " ms");
+	}
+	
+	/**
+	 * Get distinct location categories
+	 * @return a list of all the unique categories
+	 */
+	static ArrayList<String> getDistinctLocationCategories() {
+		System.out.print("get distinct categories: ");
+		ArrayList<String> list = new ArrayList<String>();
+		long start = System.currentTimeMillis();
+		MongoCursor<String> categories = locations.distinct("categories", String.class).iterator();
+		while(categories.hasNext()) {
+			list.add(categories.next().toString());
 		}
-		
-		/*
-		String document = args[0];
-		
-		try {
-			String[] sentences = NLPFactory.getSentences(document, MODELS_DIRECTORY + "en-sent.bin");
-			int count = 1;
-			for(String s : sentences)
-				System.out.println("Sentence " + count++ + ": " + s);
-
-			/*
-			String[] tokens = NLPFactory.getTokens(sentences[sentenceIndex], MODELS_DIRECTORY + "en-token.bin");
-			for(String s : tokens) {
-				System.out.print(s + ", ");
-			}
-			String[] tags = NLPFactory.getPOS(tokens, MODELS_DIRECTORY + "en-pos-maxent.bin");
-			String[] names = NLPFactory.getNames(tokens, MODELS_DIRECTORY + "en-ner-person.bin");
-			String[] chunks = NLPFactory.getChunks(tokens, tags, MODELS_DIRECTORY + "en-chunker.bin");
-			printTokenTable(tokens, tags, chunks);
-			printNames(names);
-			
-		} catch (IOException ex) {
-			ex.printStackTrace();
-		}*/
-		
+		long finish = System.currentTimeMillis();
+		System.out.println("elapsed " + (finish - start) + " ms, count " + list.size());
+		return list;
+	}
+	
+	/**
+	 * Get a list of business IDs from locations collection
+	 * @param category array in locations collection
+	 * @return a list of business IDs
+	 */
+	static ArrayList<String> getBusinessIdList(String category) {
+		System.out.print("get business ids: ");
+		ArrayList<String> list = new ArrayList<String>();
+		long start = System.currentTimeMillis();
+		MongoCursor<Document> cursor = locations.find(eq("categories", category)).iterator();
+		while(cursor.hasNext()) {
+			list.add(cursor.next().getString("business_id"));
+		}
+		long finish = System.currentTimeMillis();
+		System.out.println("elapsed " + (finish - start) + " ms, count " + list.size());
+		return list;
+	}
+	
+	/**
+	 * Get a list of review IDs from reviews collection, given a list of business IDs
+	 * @param businessIdList a list of IDs retrieved from getBusinessIdList() method
+	 * @return a list of review IDs
+	 */
+	static ArrayList<String> getBusinessReviewIdList(ArrayList<String> businessIdList) {
+		System.out.print("get review ids: ");
+		ArrayList<String> list = new ArrayList<String>();
+		BasicDBObject filter = new BasicDBObject("$in", businessIdList);
+		BasicDBObject query = new BasicDBObject("business_id", filter);
+		long start = System.currentTimeMillis();
+		MongoCursor<Document> cursor = reviews.find(query).iterator();
+		while(cursor.hasNext()) {
+			list.add(cursor.next().getString("review_id"));
+		}
+		long finish = System.currentTimeMillis();
+		System.out.println("elapsed " + (finish - start) + " ms, count " + list.size());
+		return list;
 	}
 }

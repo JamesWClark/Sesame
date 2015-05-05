@@ -72,11 +72,15 @@ public class Main {
 		JsonObject sentences = document.get("sentences").getAsJsonObject();
 		JsonArray sentence = sentences.get("sentence").getAsJsonArray();
 		
+		//for one document - eventually replace with a loop
 		
+		//foreach sentence
 		for(int i = 0; i < sentence.size(); i++) {
 			JsonObject sentenceIndex = sentence.get(i).getAsJsonObject();
 			JsonObject tokens = sentenceIndex.get("tokens").getAsJsonObject();
 			JsonArray token = tokens.get("token").getAsJsonArray();
+			
+			//foreach token
 			for(int k = 0; k < token.size(); k++) {
 				JsonObject tokenIndex = token.get(k).getAsJsonObject();
 				String pos = tokenIndex.get("POS").getAsString();
@@ -84,13 +88,25 @@ public class Main {
 				String word = tokenIndex.get("word").getAsString();
 				//System.out.println(word + " - " + lemma + " - " + pos);
 			}
-			//needs dependency resolution
+			
+			//dependency resolution - we may end up not using this
+			JsonArray dependencies = sentenceIndex.get("dependencies").getAsJsonArray();
+			for(int m = 0; m < dependencies.size(); m++) {
+				JsonObject dependencyIndex = dependencies.get(m).getAsJsonObject();
+				JsonArray dep = dependencyIndex.get("dep").getAsJsonArray();
+				for(int n = 0; n < dep.size(); n++) {
+					JsonObject depIndex = dep.get(n).getAsJsonObject();
+					//refer to http://nlp.stanford.edu/software/lex-parser.shtml#Sample
+				}
+			}
 		}
 		
+		//this problem exists in our data (observed in coref) : 
+		//stackoverflow.com/questions/1823264/quickest-way-to-convert-xml-to-json-in-java#answer-15015482
+		//the following block is written for json style : http://jsonmate.com/permalink/554839d0aa522bae3683ee34
 		
-		//this block written for : http://jsonmate.com/permalink/554839d0aa522bae3683ee34
+		//coreference resolution
 		JsonObject coreferenceObject = document.get("coreference").getAsJsonObject();
-		//coreference = coreference.get("coreference").getAsJsonObject(); //try-catch here, some coref drill down twice
 		JsonArray coreferenceArray = coreferenceObject.get("coreference").getAsJsonArray();
 		for(int i = 0; i < coreferenceArray.size(); i++) {
 			JsonObject coreferenceIndex = coreferenceArray.get(i).getAsJsonObject();

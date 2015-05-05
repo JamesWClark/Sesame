@@ -2,8 +2,12 @@
  * QUERY EXAMPLES
  * https://github.com/mongodb/mongo-java-driver/blob/master/driver/src/examples/primer/QueryPrimer.java
  * 
- * JSON EXAMPLE
- * http://www.jsonmate.com/permalink/55469b30aa522bae3683ee2c
+ * JSON EXAMPLE (see note below)
+ * 1- http://www.jsonmate.com/permalink/55469b30aa522bae3683ee2c
+ * 2- http://jsonmate.com/permalink/554839d0aa522bae3683ee34
+ * 
+ * Note: Look at example 2 compared to 1, specifically at coreference. Observe there is discrepancy in objects:
+ * coreference.coreference.mentions[] != coreference.mentions[]
  * 
  * import static com.mongodb.client.model.Filters.*;
  */
@@ -67,6 +71,8 @@ public class Main {
 		JsonObject document = root.get("document").getAsJsonObject();
 		JsonObject sentences = document.get("sentences").getAsJsonObject();
 		JsonArray sentence = sentences.get("sentence").getAsJsonArray();
+		
+		
 		for(int i = 0; i < sentence.size(); i++) {
 			JsonObject sentenceIndex = sentence.get(i).getAsJsonObject();
 			JsonObject tokens = sentenceIndex.get("tokens").getAsJsonObject();
@@ -76,9 +82,25 @@ public class Main {
 				String pos = tokenIndex.get("POS").getAsString();
 				String lemma = tokenIndex.get("lemma").getAsString();
 				String word = tokenIndex.get("word").getAsString();
-				System.out.println(word + " - " + lemma + " - " + pos);
+				//System.out.println(word + " - " + lemma + " - " + pos);
+			}
+			//needs dependency resolution
+		}
+		
+		
+		//this block written for : http://jsonmate.com/permalink/554839d0aa522bae3683ee34
+		JsonObject coreferenceObject = document.get("coreference").getAsJsonObject();
+		//coreference = coreference.get("coreference").getAsJsonObject(); //try-catch here, some coref drill down twice
+		JsonArray coreferenceArray = coreferenceObject.get("coreference").getAsJsonArray();
+		for(int i = 0; i < coreferenceArray.size(); i++) {
+			JsonObject coreferenceIndex = coreferenceArray.get(i).getAsJsonObject();
+			JsonArray mention = coreferenceIndex.get("mention").getAsJsonArray();
+			for(int k = 0; k < mention.size(); k++) {
+				JsonObject mentionIndex = mention.get(k).getAsJsonObject();
+				System.out.println(mentionIndex.get("text").getAsString());
 			}
 		}
+		
 		long finish = System.currentTimeMillis();
 		System.out.println("elapsed " + (finish - start) + " ms");
 	}

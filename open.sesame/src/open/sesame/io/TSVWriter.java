@@ -20,9 +20,11 @@ import edu.mit.jwi.item.POS;
 
 public class TSVWriter {
 
+ 	public static final String WORDNET_PATH = "C:/Program Files (x86)/WordNet/3.0/dict";
+	
 	StopWords stopwords = new StopWords();
 	//gonna need a dictionary for lemma lookups
-	WordNet wordnet = new WordNet(Main.WORDNET_PATH);
+	WordNet wordnet = new WordNet(WORDNET_PATH);
 	//the dictionary needs a simplified list of POS tags (noun, verb, adjective, adverb)
 	HashMap<String, POS> wordnetPOSMap = PennTreebankPOS.getWordNetAssociationsMap();
 	

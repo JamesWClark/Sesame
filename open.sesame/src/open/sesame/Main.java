@@ -16,7 +16,15 @@ package open.sesame;
 
 import static com.mongodb.client.model.Filters.eq;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 import org.bson.Document;
 
@@ -31,13 +39,25 @@ import com.mongodb.client.MongoDatabase;
 
 public class Main {
 
+	//db stuff
 	private static final MongoClient mongo = new MongoClient();
 	private static final MongoDatabase db = mongo.getDatabase("yelp");
 	private static final MongoCollection<Document> locations = db.getCollection("locations");
 	private static final MongoCollection<Document> reviews = db.getCollection("reviews");
 	private static final MongoCollection<Document> corenlp = db.getCollection("corenlp");
 	
+	//for tfidf
+	private static Map<String, Integer> tokens = new HashMap<String, Integer>();
+	private static Map<String, Integer> docs = new HashMap<String, Integer>();
+	private static ArrayList<Integer> tokenColumns = new ArrayList<Integer>();
+	private static ArrayList<Integer> documentRows = new ArrayList<Integer>();
+	
+	//stopwords
+	private static Set<String> stopwords = new HashSet<String>();
+	
 	public static void main(String[] args) {
+
+		loadStopWords("stopwords-long");
 		
 		//can foreach on categories, but let's stay simple with sandwiches or other for now
 		String category = "Sandwiches";
@@ -51,6 +71,34 @@ public class Main {
 		
 
 		mongo.close();
+	}
+	
+	/**
+	 * Check if a word or lemma is in the stop word list
+	 * @param wordOrLemma the word or lemma to be checked
+	 * @return true if yes, false if no
+	 */
+	static boolean isStopWord(String wordOrLemma) {
+		if(stopwords.contains(wordOrLemma))
+			return true;
+		else 
+			return false;
+	}
+	
+	/**
+	 * Loads a stop word file into memory
+	 * @param fileName Name of the stop word file
+	 */
+	static void loadStopWords(String fileName) {
+		File file = new File(fileName);
+		try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+		    String line;
+		    while ((line = br.readLine()) != null) {
+		       stopwords.add(line);
+		    }
+		} catch (IOException ex) {
+			ex.printStackTrace();
+		}
 	}
 	
 	/**
@@ -69,6 +117,7 @@ public class Main {
 		JsonParser parser = new JsonParser();
 		JsonObject root = parser.parse(json).getAsJsonObject().get("root").getAsJsonObject();
 		JsonObject document = root.get("document").getAsJsonObject();
+		String review_id = document.get("review_id").getAsString();
 		JsonObject sentences = document.get("sentences").getAsJsonObject();
 		JsonArray sentence = sentences.get("sentence").getAsJsonArray();
 		
@@ -87,6 +136,11 @@ public class Main {
 				String lemma = tokenIndex.get("lemma").getAsString();
 				String word = tokenIndex.get("word").getAsString();
 				//System.out.println(word + " - " + lemma + " - " + pos);
+				
+				if(false == isStopWord(lemma)) {
+					String represent = lemma + ":;:" + pos;
+					incrementTfidf(represent, review_id);
+				}
 			}
 			
 			//dependency resolution - we may end up not using this
@@ -119,6 +173,10 @@ public class Main {
 		
 		long finish = System.currentTimeMillis();
 		System.out.println("elapsed " + (finish - start) + " ms");
+	}
+	
+	static void incrementTfidf(String token, String document) {
+		
 	}
 	
 	/**

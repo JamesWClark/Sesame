@@ -101,11 +101,14 @@ public class Main {
 	}
 	
 	static void tfidf(Map<String, Token> tokensMap) {
+		int totalTokens = 0;
 		Iterator it = tokensMap.entrySet().iterator();
 		while(it.hasNext()) {
 			Entry pair = (Entry)it.next();
-			Token t = (Token)pair.getValue();
-			System.out.println(t);
+			Token token = (Token)pair.getValue();
+			token.tf = (double)(token.count / totalTokens);
+			
+			totalTokens += token.count;
 		}
 	}
 	

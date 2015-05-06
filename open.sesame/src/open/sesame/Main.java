@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.bson.Document;
@@ -47,10 +49,7 @@ public class Main {
 	private static final MongoCollection<Document> corenlp = db.getCollection("corenlp");
 	
 	//for tfidf
-	private static Map<String, Integer> tokensMap = new HashMap<String, Integer>();
-	private static Map<String, Integer> docsMap = new HashMap<String, Integer>();
-	private static ArrayList<Integer> tokenColumns = new ArrayList<Integer>();
-	private static ArrayList<Integer> documentRows = new ArrayList<Integer>();
+	private static Map<String, Token> tokensMap = new HashMap<String, Token>();
 	
 	//stopwords
 	private static Set<String> stopwords = new HashSet<String>();
@@ -67,8 +66,8 @@ public class Main {
 		ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
 		
 		
-		tfidf(reviewIds);
-		
+		processTokens(reviewIds);
+		tfidf(tokensMap);
 
 		mongo.close();
 	}
@@ -101,11 +100,20 @@ public class Main {
 		}
 	}
 	
+	static void tfidf(Map<String, Token> tokensMap) {
+		Iterator it = tokensMap.entrySet().iterator();
+		while(it.hasNext()) {
+			Entry pair = (Entry)it.next();
+			Token t = (Token)pair.getValue();
+			System.out.println(t);
+		}
+	}
+	
 	/**
-	 * Start a TFIDF process on the corenlp result set
+	 * Process token values from the corenlp result set
 	 * @param reviewIdList a list of review IDs from the reviews collection
 	 */
-	static void tfidf(ArrayList<String> reviewIdList) {
+	static void processTokens(ArrayList<String> reviewIdList) {
 		System.out.print("get review nlp: ");
 		BasicDBObject filter = new BasicDBObject("$in", reviewIdList);
 		BasicDBObject query = new BasicDBObject("root.document.review_id", filter);
@@ -137,9 +145,19 @@ public class Main {
 				String word = tokenIndex.get("word").getAsString();
 				//System.out.println(word + " - " + lemma + " - " + pos);
 				
+				//increment non stop word tokens
 				if(false == isStopWord(lemma)) {
 					String represent = lemma + ":;:" + pos;
-					incrementTfidf(represent, review_id);
+					Token t = tokensMap.get(represent);
+					if(null == t) {
+						t = new Token(represent);
+						t.documents.add(review_id);
+						tokensMap.put(represent, t);
+					} else {
+						t.documents.add(review_id);
+						t.count++;
+						tokensMap.put(represent, t);
+					}
 				}
 			}
 			
@@ -173,31 +191,6 @@ public class Main {
 		
 		long finish = System.currentTimeMillis();
 		System.out.println("elapsed " + (finish - start) + " ms");
-	}
-	
-	
-	static int tokenCounter = 0;
-	static int docsCounter = 0;
-	/**
-	 * Counts tokens and documents in a combo of maps and array lists to create a 2D vector space
-	 * @param token
-	 * @param document
-	 */
-	static void incrementTfidf(String token, String document) {
-		int tIndex = tokensMap.getOrDefault(token, tokenCounter++);
-		int dIndex = docsMap.getOrDefault(document, docsCounter++);
-		try {
-			int val = tokenColumns.get(tIndex);
-			tokenColumns.set(tIndex, ++val);
-		} catch (IndexOutOfBoundsException ex) {
-			tokenColumns.add(1); //adds new at an index which happens to equal tokenCounter
-		}
-		try {
-			int val = documentRows.get(tIndex);
-			documentRows.set(tIndex, ++val);
-		} catch (IndexOutOfBoundsException ex) {
-			documentRows.add(1);
-		}
 	}
 	
 	/**

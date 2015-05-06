@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -40,6 +41,9 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 
 public class Main {
+	
+	static int totalDocuments = 0;
+	static int totalTokens = 0;
 
 	//db stuff
 	private static final MongoClient mongo = new MongoClient();
@@ -65,9 +69,18 @@ public class Main {
 		ArrayList<String> businessIds = getBusinessIdList(category);
 		ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
 		
+		totalDocuments = reviewIds.size();
 		
 		processTokens(reviewIds);
 		tfidf(tokensMap);
+		
+		ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
+		Collections.sort(sortedTfidfTokens);
+		
+		for(int i = 0; i < sortedTfidfTokens.size(); i++) {
+			Token t = sortedTfidfTokens.get(i);
+			System.out.println(t + ": " + t.tfidf);
+		}
 
 		mongo.close();
 	}
@@ -100,15 +113,31 @@ public class Main {
 		}
 	}
 	
+	/**
+	 * Calculates a TFIDF score for categorical result set from MongoDB
+	 * @param tokensMap a HashMap of tokens
+	 */
 	static void tfidf(Map<String, Token> tokensMap) {
-		int totalTokens = 0;
+		double maxTF = -1d;
+		
+		//1st pass through for general tf
 		Iterator it = tokensMap.entrySet().iterator();
 		while(it.hasNext()) {
 			Entry pair = (Entry)it.next();
 			Token token = (Token)pair.getValue();
-			token.tf = (double)(token.count / totalTokens);
-			
-			totalTokens += token.count;
+			token.tf = (double)token.count / totalTokens;
+			if(token.tf > maxTF)
+				maxTF = token.tf;
+		}
+		
+		//2nd pass through for augmented tfidf
+		it = tokensMap.entrySet().iterator();
+		while(it.hasNext()) {
+			Entry pair = (Entry)it.next();
+			Token token = (Token)pair.getValue();
+			token.tf = 0.5 + ((0.5 * token.tf) / maxTF);
+			token.idf = Math.log10((double)totalDocuments / token.documents.size());
+			token.tfidf = token.tf * token.idf;
 		}
 	}
 	
@@ -122,76 +151,86 @@ public class Main {
 		BasicDBObject query = new BasicDBObject("root.document.review_id", filter);
 		long start = System.currentTimeMillis();
 		MongoCursor<Document> cursor = corenlp.find(query).iterator();
-		Document corejson = cursor.next();
-		String json = corejson.toJson();
 		
-		JsonParser parser = new JsonParser();
-		JsonObject root = parser.parse(json).getAsJsonObject().get("root").getAsJsonObject();
-		JsonObject document = root.get("document").getAsJsonObject();
-		String review_id = document.get("review_id").getAsString();
-		JsonObject sentences = document.get("sentences").getAsJsonObject();
-		JsonArray sentence = sentences.get("sentence").getAsJsonArray();
-		
-		//for one document - eventually replace with a loop
-		
-		//foreach sentence
-		for(int i = 0; i < sentence.size(); i++) {
-			JsonObject sentenceIndex = sentence.get(i).getAsJsonObject();
-			JsonObject tokens = sentenceIndex.get("tokens").getAsJsonObject();
-			JsonArray token = tokens.get("token").getAsJsonArray();
+		//foreach document
+		int cursorCount = 0;
+		while(cursor.hasNext()) {
 			
-			//foreach token
-			for(int k = 0; k < token.size(); k++) {
-				JsonObject tokenIndex = token.get(k).getAsJsonObject();
-				String pos = tokenIndex.get("POS").getAsString();
-				String lemma = tokenIndex.get("lemma").getAsString();
-				String word = tokenIndex.get("word").getAsString();
-				//System.out.println(word + " - " + lemma + " - " + pos);
+			//visual marker in console log
+			System.out.println("progress: " + cursorCount + " / " + totalDocuments);
+			
+			Document corejson = cursor.next();
+			String json = corejson.toJson();
+			JsonParser parser = new JsonParser();
+			JsonObject root = parser.parse(json).getAsJsonObject().get("root").getAsJsonObject();
+			JsonObject document = root.get("document").getAsJsonObject();
+			String review_id = document.get("review_id").getAsString();
+			JsonObject sentences = document.get("sentences").getAsJsonObject();
+
+			JsonArray sentence = sentences.get("sentence").getAsJsonArray();
+
+			//foreach sentence
+			for(int i = 0; i < sentence.size(); i++) {
+				JsonObject sentenceIndex = sentence.get(i).getAsJsonObject();
+				JsonObject tokens = sentenceIndex.get("tokens").getAsJsonObject();
+				JsonArray token = tokens.get("token").getAsJsonArray();
 				
-				//increment non stop word tokens
-				if(false == isStopWord(lemma)) {
-					String represent = lemma + ":;:" + pos;
-					Token t = tokensMap.get(represent);
-					if(null == t) {
-						t = new Token(represent);
-						t.documents.add(review_id);
-						tokensMap.put(represent, t);
-					} else {
-						t.documents.add(review_id);
-						t.count++;
-						tokensMap.put(represent, t);
+				//foreach token
+				for(int k = 0; k < token.size(); k++) {
+					JsonObject tokenIndex = token.get(k).getAsJsonObject();
+					String pos = tokenIndex.get("POS").getAsString();
+					String lemma = tokenIndex.get("lemma").getAsString();
+					String word = tokenIndex.get("word").getAsString();
+					
+					//increment non stop word tokens
+					if(false == isStopWord(lemma)) {
+						String represent = lemma + ":;:" + pos;
+						Token t = tokensMap.get(represent);
+						if(null == t) {
+							t = new Token(represent);
+							t.documents.add(review_id);
+							tokensMap.put(represent, t);
+						} else {
+							t.documents.add(review_id);
+							t.count++;
+							tokensMap.put(represent, t);
+						}
+						totalTokens++;
 					}
 				}
+				
+				/*
+				//dependency resolution - we may end up not using this
+				JsonArray dependencies = sentenceIndex.get("dependencies").getAsJsonArray();
+				for(int m = 0; m < dependencies.size(); m++) {
+					JsonObject dependencyIndex = dependencies.get(m).getAsJsonObject();
+					JsonArray dep = dependencyIndex.get("dep").getAsJsonArray();
+					for(int n = 0; n < dep.size(); n++) {
+						JsonObject depIndex = dep.get(n).getAsJsonObject();
+						//refer to http://nlp.stanford.edu/software/lex-parser.shtml#Sample
+					}
+				}
+				*/
 			}
+		
+			//this problem exists in our data (observed in coref) : 
+			//stackoverflow.com/questions/1823264/quickest-way-to-convert-xml-to-json-in-java#answer-15015482
+			//the following block is written for json style : http://jsonmate.com/permalink/554839d0aa522bae3683ee34
 			
-			//dependency resolution - we may end up not using this
-			JsonArray dependencies = sentenceIndex.get("dependencies").getAsJsonArray();
-			for(int m = 0; m < dependencies.size(); m++) {
-				JsonObject dependencyIndex = dependencies.get(m).getAsJsonObject();
-				JsonArray dep = dependencyIndex.get("dep").getAsJsonArray();
-				for(int n = 0; n < dep.size(); n++) {
-					JsonObject depIndex = dep.get(n).getAsJsonObject();
-					//refer to http://nlp.stanford.edu/software/lex-parser.shtml#Sample
+			/*
+			//coreference resolution
+			JsonObject coreferenceObject = document.get("coreference").getAsJsonObject();
+			JsonArray coreferenceArray = coreferenceObject.get("coreference").getAsJsonArray();
+			for(int i = 0; i < coreferenceArray.size(); i++) {
+				JsonObject coreferenceIndex = coreferenceArray.get(i).getAsJsonObject();
+				JsonArray mention = coreferenceIndex.get("mention").getAsJsonArray();
+				for(int k = 0; k < mention.size(); k++) {
+					JsonObject mentionIndex = mention.get(k).getAsJsonObject();
+					//System.out.println(mentionIndex.get("text").getAsString());
 				}
 			}
+			*/
 		}
-		
-		//this problem exists in our data (observed in coref) : 
-		//stackoverflow.com/questions/1823264/quickest-way-to-convert-xml-to-json-in-java#answer-15015482
-		//the following block is written for json style : http://jsonmate.com/permalink/554839d0aa522bae3683ee34
-		
-		//coreference resolution
-		JsonObject coreferenceObject = document.get("coreference").getAsJsonObject();
-		JsonArray coreferenceArray = coreferenceObject.get("coreference").getAsJsonArray();
-		for(int i = 0; i < coreferenceArray.size(); i++) {
-			JsonObject coreferenceIndex = coreferenceArray.get(i).getAsJsonObject();
-			JsonArray mention = coreferenceIndex.get("mention").getAsJsonArray();
-			for(int k = 0; k < mention.size(); k++) {
-				JsonObject mentionIndex = mention.get(k).getAsJsonObject();
-				//System.out.println(mentionIndex.get("text").getAsString());
-			}
-		}
-		
 		long finish = System.currentTimeMillis();
 		System.out.println("elapsed " + (finish - start) + " ms");
 	}

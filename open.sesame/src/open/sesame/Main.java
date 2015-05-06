@@ -47,8 +47,8 @@ public class Main {
 	private static final MongoCollection<Document> corenlp = db.getCollection("corenlp");
 	
 	//for tfidf
-	private static Map<String, Integer> tokens = new HashMap<String, Integer>();
-	private static Map<String, Integer> docs = new HashMap<String, Integer>();
+	private static Map<String, Integer> tokensMap = new HashMap<String, Integer>();
+	private static Map<String, Integer> docsMap = new HashMap<String, Integer>();
 	private static ArrayList<Integer> tokenColumns = new ArrayList<Integer>();
 	private static ArrayList<Integer> documentRows = new ArrayList<Integer>();
 	
@@ -167,7 +167,7 @@ public class Main {
 			JsonArray mention = coreferenceIndex.get("mention").getAsJsonArray();
 			for(int k = 0; k < mention.size(); k++) {
 				JsonObject mentionIndex = mention.get(k).getAsJsonObject();
-				System.out.println(mentionIndex.get("text").getAsString());
+				//System.out.println(mentionIndex.get("text").getAsString());
 			}
 		}
 		
@@ -175,8 +175,29 @@ public class Main {
 		System.out.println("elapsed " + (finish - start) + " ms");
 	}
 	
+	
+	static int tokenCounter = 0;
+	static int docsCounter = 0;
+	/**
+	 * Counts tokens and documents in a combo of maps and array lists to create a 2D vector space
+	 * @param token
+	 * @param document
+	 */
 	static void incrementTfidf(String token, String document) {
-		
+		int tIndex = tokensMap.getOrDefault(token, tokenCounter++);
+		int dIndex = docsMap.getOrDefault(document, docsCounter++);
+		try {
+			int val = tokenColumns.get(tIndex);
+			tokenColumns.set(tIndex, ++val);
+		} catch (IndexOutOfBoundsException ex) {
+			tokenColumns.add(1); //adds new at an index which happens to equal tokenCounter
+		}
+		try {
+			int val = documentRows.get(tIndex);
+			documentRows.set(tIndex, ++val);
+		} catch (IndexOutOfBoundsException ex) {
+			documentRows.add(1);
+		}
 	}
 	
 	/**

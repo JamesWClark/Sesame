@@ -20,28 +20,20 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
 import org.bson.Document;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.reflect.TypeToken;
 import com.mongodb.BasicDBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
@@ -165,7 +157,7 @@ public class Main {
 		while(cursor.hasNext()) {
 			
 			//visual marker in console log
-			System.out.println("progress: " + cursorCount + " / " + totalDocuments);
+			System.out.println("progress: " + cursorCount++ + " / " + totalDocuments);
 			
 			Document corejson = cursor.next();
 			String json = corejson.toJson();
@@ -176,7 +168,6 @@ public class Main {
 			JsonObject sentences = document.get("sentences").getAsJsonObject();
 
 			JsonArray sentence = bruteForceJsonArray(sentences, "sentence");
-			
 			//foreach sentence
 			for(int i = 0; i < sentence.size(); i++) {
 				JsonObject sentenceIndex = sentence.get(i).getAsJsonObject();
@@ -254,7 +245,8 @@ public class Main {
 	        return object.get(key).getAsJsonArray();
 	    } else {
 	        JsonArray oneElementArray = new JsonArray();
-	        oneElementArray.add(new JsonObject());
+	        oneElementArray.add(object.get(key).getAsJsonObject());
+	        System.out.println(oneElementArray.toString());
 	        return oneElementArray;
 	    }
 	}

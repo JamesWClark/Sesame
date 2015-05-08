@@ -20,20 +20,28 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
 import org.bson.Document;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonDeserializationContext;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.reflect.TypeToken;
 import com.mongodb.BasicDBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
@@ -167,13 +175,13 @@ public class Main {
 			String review_id = document.get("review_id").getAsString();
 			JsonObject sentences = document.get("sentences").getAsJsonObject();
 
-			JsonArray sentence = sentences.get("sentence").getAsJsonArray();
-
+			JsonArray sentence = bruteForceJsonArray(sentences, "sentence");
+			
 			//foreach sentence
 			for(int i = 0; i < sentence.size(); i++) {
 				JsonObject sentenceIndex = sentence.get(i).getAsJsonObject();
 				JsonObject tokens = sentenceIndex.get("tokens").getAsJsonObject();
-				JsonArray token = tokens.get("token").getAsJsonArray();
+				JsonArray token = bruteForceJsonArray(tokens, "token");
 				
 				//foreach token
 				for(int k = 0; k < token.size(); k++) {
@@ -235,6 +243,32 @@ public class Main {
 		System.out.println("elapsed " + (finish - start) + " ms");
 	}
 	
+	static JsonArray bruteForceJsonArray(JsonObject object, String key) {
+		if(object.get(key).isJsonArray()) {
+			System.out.println(object.toString());
+
+			return object.get(key).getAsJsonArray();
+		} else {
+			Type jsonTokenType = new TypeToken<List<JsonToken>>() {}.getType();
+			Gson gson = new GsonBuilder().registerTypeAdapter(jsonTokenType, new JsonSentenceAdapter()).create();
+			JsonToken t = new JsonToken();
+			JsonElement ele = gson.fromJson(object.toString(), JsonElement.class);
+			//System.out.println(gson.tojson()
+					
+			System.out.println("broken: " + ele.toString());
+	        System.exit(0);
+			/*
+			JsonObject temp = object.get(key).getAsJsonObject();
+			String fixed = "{'" + key +  "':[" + temp.toString() + "]}";
+	        System.out.println("pre-fix: " + fixed);            
+	        temp = new JsonParser().parse(fixed).getAsJsonObject();         
+	        System.out.println("fixed: " + object.toString());
+	        */
+	        return object.get(key).getAsJsonArray();
+	        
+		}
+	}
+	
 	/**
 	 * Get distinct location categories
 	 * @return a list of all the unique categories
@@ -289,4 +323,21 @@ public class Main {
 		System.out.println("elapsed " + (finish - start) + " ms, count " + list.size());
 		return list;
 	}
+
+	private static class JsonSentenceAdapter implements JsonDeserializer<List<JsonToken>> {
+	    public List<JsonToken> deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext ctx) {
+	        List<JsonToken> vals = new ArrayList<JsonToken>();
+	        if (json.isJsonArray()) {
+	            for (JsonElement e : json.getAsJsonArray()) {
+	                vals.add((JsonToken) ctx.deserialize(e, JsonToken.class));
+	            }
+	        } else if (json.isJsonObject()) {
+	            vals.add((JsonToken) ctx.deserialize(json, JsonToken.class));
+	        } else {
+	            throw new RuntimeException("Unexpected JSON type: " + json.getClass());
+	        }
+	        return vals;
+	    }
+	}
 }
+

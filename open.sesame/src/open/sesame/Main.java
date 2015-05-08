@@ -243,30 +243,20 @@ public class Main {
 		System.out.println("elapsed " + (finish - start) + " ms");
 	}
 	
+	/**
+	 * Force a JsonObject that should be a JsonArray
+	 * @param object the JsonObject to force
+	 * @param key they key in the object that will access the value to convert to array
+	 * @return a JsonArray data type
+	 */
 	static JsonArray bruteForceJsonArray(JsonObject object, String key) {
-		if(object.get(key).isJsonArray()) {
-			System.out.println(object.toString());
-
-			return object.get(key).getAsJsonArray();
-		} else {
-			Type jsonTokenType = new TypeToken<List<JsonToken>>() {}.getType();
-			Gson gson = new GsonBuilder().registerTypeAdapter(jsonTokenType, new JsonSentenceAdapter()).create();
-			JsonToken t = new JsonToken();
-			JsonElement ele = gson.fromJson(object.toString(), JsonElement.class);
-			//System.out.println(gson.tojson()
-					
-			System.out.println("broken: " + ele.toString());
-	        System.exit(0);
-			/*
-			JsonObject temp = object.get(key).getAsJsonObject();
-			String fixed = "{'" + key +  "':[" + temp.toString() + "]}";
-	        System.out.println("pre-fix: " + fixed);            
-	        temp = new JsonParser().parse(fixed).getAsJsonObject();         
-	        System.out.println("fixed: " + object.toString());
-	        */
+	    if (object.get(key).isJsonArray()) {
 	        return object.get(key).getAsJsonArray();
-	        
-		}
+	    } else {
+	        JsonArray oneElementArray = new JsonArray();
+	        oneElementArray.add(new JsonObject());
+	        return oneElementArray;
+	    }
 	}
 	
 	/**
@@ -322,22 +312,6 @@ public class Main {
 		long finish = System.currentTimeMillis();
 		System.out.println("elapsed " + (finish - start) + " ms, count " + list.size());
 		return list;
-	}
-
-	private static class JsonSentenceAdapter implements JsonDeserializer<List<JsonToken>> {
-	    public List<JsonToken> deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext ctx) {
-	        List<JsonToken> vals = new ArrayList<JsonToken>();
-	        if (json.isJsonArray()) {
-	            for (JsonElement e : json.getAsJsonArray()) {
-	                vals.add((JsonToken) ctx.deserialize(e, JsonToken.class));
-	            }
-	        } else if (json.isJsonObject()) {
-	            vals.add((JsonToken) ctx.deserialize(json, JsonToken.class));
-	        } else {
-	            throw new RuntimeException("Unexpected JSON type: " + json.getClass());
-	        }
-	        return vals;
-	    }
 	}
 }
 

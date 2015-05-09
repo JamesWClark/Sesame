@@ -34,6 +34,9 @@ import org.bson.Document;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.hankcs.lda.Corpus;
+import com.hankcs.lda.LdaGibbsSampler;
+import com.hankcs.lda.LdaUtil;
 import com.mongodb.BasicDBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
@@ -41,7 +44,7 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 
 public class Main {
-
+	
 	static int totalDocuments = 0;
 	static int totalTokens = 0;
 
@@ -51,32 +54,37 @@ public class Main {
 	private static final MongoCollection<Document> locations = db.getCollection("locations");
 	private static final MongoCollection<Document> reviews = db.getCollection("reviews");
 	private static final MongoCollection<Document> corenlp = db.getCollection("corenlp");
-
+	
 	//for tfidf
 	private static Map<String, Token> tokensMap = new HashMap<String, Token>();
-
+	
+	//LDA
+	private static HashMap<String, ArrayList<Token>> documentTokenMap = new HashMap<String, ArrayList<Token>>();
+	private static HashMap<String, Double>[] topicMap;
+	
 	//stopwords
 	private static Set<String> stopwords = new HashSet<String>();
-
+	
 	public static void main(String[] args) {
 
 		loadStopWords("stopwords-long");
-
+		
 		//can foreach on categories, but let's stay simple with sandwiches or other for now
 		String category = "Sandwiches";
-
+		
 		ArrayList<String> categories = getDistinctLocationCategories();
+		//get business Id's in category "Sandwiches"
 		ArrayList<String> businessIds = getBusinessIdList(category);
 		ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
-
+		
 		totalDocuments = reviewIds.size();
-
+		
 		processTokens(reviewIds);
 		tfidf(tokensMap);
-
+		lda(documentTokenMap);
 		ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
 		Collections.sort(sortedTfidfTokens);
-
+		
 		for(int i = 0; i < sortedTfidfTokens.size(); i++) {
 			Token t = sortedTfidfTokens.get(i);
 			System.out.println(t + ": " + t.tfidf);
@@ -84,7 +92,7 @@ public class Main {
 
 		mongo.close();
 	}
-
+	
 	/**
 	 * Check if a word or lemma is in the stop word list
 	 * @param wordOrLemma the word or lemma to be checked
@@ -96,7 +104,7 @@ public class Main {
 		else 
 			return false;
 	}
-
+	
 	/**
 	 * Loads a stop word file into memory
 	 * @param fileName Name of the stop word file
@@ -104,22 +112,22 @@ public class Main {
 	static void loadStopWords(String fileName) {
 		File file = new File(fileName);
 		try (BufferedReader br = new BufferedReader(new FileReader(file))) {
-			String line;
-			while ((line = br.readLine()) != null) {
-				stopwords.add(line);
-			}
+		    String line;
+		    while ((line = br.readLine()) != null) {
+		       stopwords.add(line);
+		    }
 		} catch (IOException ex) {
 			ex.printStackTrace();
 		}
 	}
-
+	
 	/**
 	 * Calculates a TFIDF score for categorical result set from MongoDB
 	 * @param tokensMap a HashMap of tokens
 	 */
 	static void tfidf(Map<String, Token> tokensMap) {
 		double maxTF = -1d;
-
+		
 		//1st pass through for general tf
 		Iterator it = tokensMap.entrySet().iterator();
 		while(it.hasNext()) {
@@ -129,7 +137,7 @@ public class Main {
 			if(token.tf > maxTF)
 				maxTF = token.tf;
 		}
-
+		
 		//2nd pass through for augmented tfidf
 		it = tokensMap.entrySet().iterator();
 		while(it.hasNext()) {
@@ -140,7 +148,27 @@ public class Main {
 			token.tfidf = token.tf * token.idf;
 		}
 	}
-
+	
+	static void lda(HashMap<String, ArrayList<Token>> documentTokenMap) {
+		Corpus corpus = new Corpus();
+		ArrayList<String> temp = new ArrayList<String>();
+		for (String document: documentTokenMap.keySet()) {
+			temp = null;
+			for (Token token: documentTokenMap.get(document)) {
+				if (temp == null) {
+					temp = new ArrayList<String>();
+				}
+				temp.add(token.toString());
+			}
+			corpus.addDocument(temp);
+		}
+		LdaGibbsSampler ldaGibbsSampler = new LdaGibbsSampler(corpus.getDocument(), corpus.getVocabularySize());
+		ldaGibbsSampler.gibbs(10);
+		double[][] phi = ldaGibbsSampler.getPhi();
+		Map<String, Double>[] topicMap = LdaUtil.translate(phi, corpus.getVocabulary(), 10);
+		LdaUtil.explain(topicMap);
+	}
+	
 	/**
 	 * Process token values from the corenlp result set
 	 * @param reviewIdList a list of review IDs from the reviews collection
@@ -151,14 +179,14 @@ public class Main {
 		BasicDBObject query = new BasicDBObject("root.document.review_id", filter);
 		long start = System.currentTimeMillis();
 		MongoCursor<Document> cursor = corenlp.find(query).iterator();
-
+		
 		//foreach document
 		int cursorCount = 0;
 		while(cursor.hasNext()) {
-
+			
 			//visual marker in console log
-			System.out.println("progress: " + cursorCount + " / " + totalDocuments);
-
+			System.out.println("progress: " + cursorCount++ + " / " + totalDocuments);
+			
 			Document corejson = cursor.next();
 			String json = corejson.toJson();
 			JsonParser parser = new JsonParser();
@@ -167,87 +195,45 @@ public class Main {
 			String review_id = document.get("review_id").getAsString();
 			JsonObject sentences = document.get("sentences").getAsJsonObject();
 
-			JsonArray sentence = sentences.get("sentence").getAsJsonArray();
-
+			JsonArray sentence = bruteForceJsonArray(sentences, "sentence");
 			//foreach sentence
 			for(int i = 0; i < sentence.size(); i++) {
 				JsonObject sentenceIndex = sentence.get(i).getAsJsonObject();
 				JsonObject tokens = sentenceIndex.get("tokens").getAsJsonObject();
-				JsonArray token = tokens.get("token").getAsJsonArray();
-				try {
-					token = tokens.get("token").getAsJsonArray();
-				} catch (IllegalStateException e) {
-					token = null;
-					System.err.println("There was a problem handling conversion from Json Array. Reference: stackoverflow.com/questions/1823264/quickest-way-to-convert-xml-to-json-in-java#answer-15015482");
-
-				}
-				if (token != null) {
-					//foreach token
-					for(int k = 0; k < token.size(); k++) {
-						JsonObject tokenIndex = token.get(k).getAsJsonObject();
-						String pos = tokenIndex.get("POS").getAsString();
-						String lemma = tokenIndex.get("lemma").getAsString();
-						String word = tokenIndex.get("word").getAsString();
-
-						//increment non stop word tokens
-						if(false == isStopWord(lemma)) {
-							String represent = lemma + ":;:" + pos;
-							Token t = tokensMap.get(represent);
-							if(null == t) {
-								t = new Token(represent);
-								t.documents.add(review_id);
-								tokensMap.put(represent, t);
-							} else {
-								t.documents.add(review_id);
-								t.count++;
-								tokensMap.put(represent, t);
-							}
-							totalTokens++;
-						}
-					}
-				} else {
-					/*
-					 * The hope here is that we can circumvent the issue we are having with our JSON arrays.
-					 * See below the tokenAsSingleObject for the JSON found during debugging. For some reason, 
-					 * getting the word, pos, or lemma below does not work as expted. NullPointerExceptions are thrown
-					 * if trying to obtain any of the three. My thought was to use regular expressions to adjust our JSON to 
-					 * look the way we want it to.
-					 */
-					JsonObject tokenAsSingleObject = sentenceIndex.get("tokens").getAsJsonObject();
-					//{"token":{"word":".","CharacterOffsetEnd":765.0,"Speaker":"PER0","POS":".","lemma":".","CharacterOffsetBegin":764.0,"NER":"O","id":1.0}}
-					/*
-					 * A lot of this code is superfluous, if I am not mistaken. However, I want to be clear how we are addressing the task at hand.
-					 */
-					//				StringBuffer sb = new StringBuffer();
-					//				String s = tokenAsSingleObject.toString();
-					//				Pattern pLeftBracket = Pattern.compile("{");
-					//				Pattern pRightBracket = Pattern.compile("}");
-					//				Matcher mLeft = pLeftBracket.matcher(s);
-					//				Matcher mRight = pRightBracket.matcher(s);
-
-					String word = tokenAsSingleObject.get("word").getAsString();
-					String pos = tokenAsSingleObject.get("POS").getAsString();
-
-					String lemma = tokenAsSingleObject.get("lemma").getAsString();
-
-
-					if (false == isStopWord(lemma)) {
+				JsonArray token = bruteForceJsonArray(tokens, "token");
+				
+				//foreach token
+				for(int k = 0; k < token.size(); k++) {
+					JsonObject tokenIndex = token.get(k).getAsJsonObject();
+					String pos = tokenIndex.get("POS").getAsString();
+					String lemma = tokenIndex.get("lemma").getAsString();
+					String word = tokenIndex.get("word").getAsString();
+					
+					//increment non stop word tokens
+					if(false == isStopWord(lemma)) {
 						String represent = lemma + ":;:" + pos;
 						Token t = tokensMap.get(represent);
 						if(null == t) {
 							t = new Token(represent);
 							t.documents.add(review_id);
 							tokensMap.put(represent, t);
+							
 						} else {
 							t.documents.add(review_id);
 							t.count++;
 							tokensMap.put(represent, t);
 						}
+						if (documentTokenMap.containsKey(review_id)) {
+							documentTokenMap.get(review_id).add(t);
+						} else {
+							documentTokenMap.put(review_id, new ArrayList<Token>());
+							documentTokenMap.get(review_id).add(t);
+						}
+						
 						totalTokens++;
-
 					}
 				}
-
+				
 				/*
 				//dependency resolution - we may end up not using this
 				JsonArray dependencies = sentenceIndex.get("dependencies").getAsJsonArray();
@@ -259,13 +245,13 @@ public class Main {
 						//refer to http://nlp.stanford.edu/software/lex-parser.shtml#Sample
 					}
 				}
-				 */
+				*/
 			}
-
+		
 			//this problem exists in our data (observed in coref) : 
 			//stackoverflow.com/questions/1823264/quickest-way-to-convert-xml-to-json-in-java#answer-15015482
 			//the following block is written for json style : http://jsonmate.com/permalink/554839d0aa522bae3683ee34
-
+			
 			/*
 			//coreference resolution
 			JsonObject coreferenceObject = document.get("coreference").getAsJsonObject();
@@ -278,12 +264,29 @@ public class Main {
 					//System.out.println(mentionIndex.get("text").getAsString());
 				}
 			}
-			 */
+			*/
 		}
 		long finish = System.currentTimeMillis();
 		System.out.println("elapsed " + (finish - start) + " ms");
 	}
-
+	
+	/**
+	 * Force a JsonObject that should be a JsonArray
+	 * @param object the JsonObject to force
+	 * @param key they key in the object that will access the value to convert to array
+	 * @return a JsonArray data type
+	 */
+	static JsonArray bruteForceJsonArray(JsonObject object, String key) {
+	    if (object.get(key).isJsonArray()) {
+	        return object.get(key).getAsJsonArray();
+	    } else {
+	        JsonArray oneElementArray = new JsonArray();
+	        oneElementArray.add(object.get(key).getAsJsonObject());
+	        System.out.println(oneElementArray.toString());
+	        return oneElementArray;
+	    }
+	}
+	
 	/**
 	 * Get distinct location categories
 	 * @return a list of all the unique categories
@@ -300,7 +303,7 @@ public class Main {
 		System.out.println("elapsed " + (finish - start) + " ms, count " + list.size());
 		return list;
 	}
-
+	
 	/**
 	 * Get a list of business IDs from locations collection
 	 * @param category array in locations collection
@@ -318,7 +321,7 @@ public class Main {
 		System.out.println("elapsed " + (finish - start) + " ms, count " + list.size());
 		return list;
 	}
-
+	
 	/**
 	 * Get a list of review IDs from reviews collection, given a list of business IDs
 	 * @param businessIdList a list of IDs retrieved from getBusinessIdList() method

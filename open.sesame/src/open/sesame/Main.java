@@ -34,6 +34,9 @@ import org.bson.Document;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.hankcs.lda.Corpus;
+import com.hankcs.lda.LdaGibbsSampler;
+import com.hankcs.lda.LdaUtil;
 import com.mongodb.BasicDBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
@@ -55,6 +58,10 @@ public class Main {
 	//for tfidf
 	private static Map<String, Token> tokensMap = new HashMap<String, Token>();
 	
+	//LDA
+	private static HashMap<String, ArrayList<Token>> documentTokenMap = new HashMap<String, ArrayList<Token>>();
+	private static HashMap<String, Double>[] topicMap;
+	
 	//stopwords
 	private static Set<String> stopwords = new HashSet<String>();
 	
@@ -66,6 +73,7 @@ public class Main {
 		String category = "Sandwiches";
 		
 		ArrayList<String> categories = getDistinctLocationCategories();
+		//get business Id's in category "Sandwiches"
 		ArrayList<String> businessIds = getBusinessIdList(category);
 		ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
 		
@@ -73,7 +81,7 @@ public class Main {
 		
 		processTokens(reviewIds);
 		tfidf(tokensMap);
-		
+		lda(documentTokenMap);
 		ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
 		Collections.sort(sortedTfidfTokens);
 		
@@ -141,6 +149,26 @@ public class Main {
 		}
 	}
 	
+	static void lda(HashMap<String, ArrayList<Token>> documentTokenMap) {
+		Corpus corpus = new Corpus();
+		ArrayList<String> temp = new ArrayList<String>();
+		for (String document: documentTokenMap.keySet()) {
+			temp = null;
+			for (Token token: documentTokenMap.get(document)) {
+				if (temp == null) {
+					temp = new ArrayList<String>();
+				}
+				temp.add(token.toString());
+			}
+			corpus.addDocument(temp);
+		}
+		LdaGibbsSampler ldaGibbsSampler = new LdaGibbsSampler(corpus.getDocument(), corpus.getVocabularySize());
+		ldaGibbsSampler.gibbs(10);
+		double[][] phi = ldaGibbsSampler.getPhi();
+		Map<String, Double>[] topicMap = LdaUtil.translate(phi, corpus.getVocabulary(), 10);
+		LdaUtil.explain(topicMap);
+	}
+	
 	/**
 	 * Process token values from the corenlp result set
 	 * @param reviewIdList a list of review IDs from the reviews collection
@@ -189,11 +217,19 @@ public class Main {
 							t = new Token(represent);
 							t.documents.add(review_id);
 							tokensMap.put(represent, t);
+							
 						} else {
 							t.documents.add(review_id);
 							t.count++;
 							tokensMap.put(represent, t);
 						}
+						if (documentTokenMap.containsKey(review_id)) {
+							documentTokenMap.get(review_id).add(t);
+						} else {
+							documentTokenMap.put(review_id, new ArrayList<Token>());
+							documentTokenMap.get(review_id).add(t);
+						}
+						
 						totalTokens++;
 					}
 				}
@@ -306,4 +342,3 @@ public class Main {
 		return list;
 	}
 }
-

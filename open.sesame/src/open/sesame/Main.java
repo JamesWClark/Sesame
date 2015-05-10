@@ -56,24 +56,22 @@ public class Main {
 	private static final MongoCollection<Document> corenlp = db.getCollection("corenlp");
 	
 	//for tfidf
-	private static Map<String, Token> tokensMap = new HashMap<String, Token>();
+	private static Map<String, Token> tokensMap = new HashMap<>();
+	private static Map<String, Review> documentsMap = new HashMap<>();
 	
 	//LDA
-	private static HashMap<String, ArrayList<Token>> documentTokenMap = new HashMap<String, ArrayList<Token>>();
 	private static HashMap<String, Double>[] topicMap;
 	
 	//stopwords
 	private static Set<String> stopwords = new HashSet<String>();
 	
 	public static void main(String[] args) {
-
 		loadStopWords("stopwords-long");
 		
 		//can foreach on categories, but let's stay simple with sandwiches or other for now
-		String category = "Sandwiches";
+		String category = "Medical Centers";		
 		
 		ArrayList<String> categories = getDistinctLocationCategories();
-		//get business Id's in category "Sandwiches"
 		ArrayList<String> businessIds = getBusinessIdList(category);
 		ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
 		
@@ -81,7 +79,6 @@ public class Main {
 		
 		processTokens(reviewIds);
 		tfidf(tokensMap);
-		lda(documentTokenMap);
 		ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
 		Collections.sort(sortedTfidfTokens);
 		
@@ -90,7 +87,22 @@ public class Main {
 			System.out.println(t + ": " + t.tfidf);
 		}
 
+		lda(documentsMap, 10, 2.0);
+
 		mongo.close();
+	}
+	
+	/**
+	 * Prints review counts by category
+	 */
+	static void printReviewCountsByCategory() {
+		ArrayList<String> categories = getDistinctLocationCategories();
+		for(String category : categories) {
+			ArrayList<String> businessIds = getBusinessIdList(category);
+			ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
+			totalDocuments = reviewIds.size();
+			System.out.println(category + " : " + totalDocuments);
+		}
 	}
 	
 	/**
@@ -149,23 +161,20 @@ public class Main {
 		}
 	}
 	
-	static void lda(HashMap<String, ArrayList<Token>> documentTokenMap) {
+	static void lda(Map<String, Review> documentsMap, int K, double tfidfThreshold) {
 		Corpus corpus = new Corpus();
-		ArrayList<String> temp = new ArrayList<String>();
-		for (String document: documentTokenMap.keySet()) {
-			temp = null;
-			for (Token token: documentTokenMap.get(document)) {
-				if (temp == null) {
-					temp = new ArrayList<String>();
-				}
-				temp.add(token.toString());
+		for (String review_id: documentsMap.keySet()) {
+			ArrayList<String> document = new ArrayList<String>();
+			for(String token_id : documentsMap.get(review_id).tokenIds) {
+				document.add(tokensMap.get(token_id).toString());
 			}
-			corpus.addDocument(temp);
+			if(document.size() > 0)
+				corpus.addDocument(document);
 		}
 		LdaGibbsSampler ldaGibbsSampler = new LdaGibbsSampler(corpus.getDocument(), corpus.getVocabularySize());
-		ldaGibbsSampler.gibbs(10);
+		ldaGibbsSampler.gibbs(K);
 		double[][] phi = ldaGibbsSampler.getPhi();
-		Map<String, Double>[] topicMap = LdaUtil.translate(phi, corpus.getVocabulary(), 10);
+		Map<String, Double>[] topicMap = LdaUtil.translate(phi, corpus.getVocabulary(), K);
 		LdaUtil.explain(topicMap);
 	}
 	
@@ -192,9 +201,12 @@ public class Main {
 			JsonParser parser = new JsonParser();
 			JsonObject root = parser.parse(json).getAsJsonObject().get("root").getAsJsonObject();
 			JsonObject document = root.get("document").getAsJsonObject();
-			String review_id = document.get("review_id").getAsString();
 			JsonObject sentences = document.get("sentences").getAsJsonObject();
-
+			
+			String review_id = document.get("review_id").getAsString();
+			Review sesameDocument = new Review(review_id);
+			documentsMap.put(review_id, sesameDocument);
+			
 			JsonArray sentence = bruteForceJsonArray(sentences, "sentence");
 			//foreach sentence
 			for(int i = 0; i < sentence.size(); i++) {
@@ -211,25 +223,15 @@ public class Main {
 					
 					//increment non stop word tokens
 					if(false == isStopWord(lemma)) {
-						String represent = lemma + ":;:" + pos;
-						Token t = tokensMap.get(represent);
+						String token_id = lemma + ":;:" + pos;
+						Token t = tokensMap.get(token_id);
 						if(null == t) {
-							t = new Token(represent);
-							t.documents.add(review_id);
-							tokensMap.put(represent, t);
-							
-						} else {
-							t.documents.add(review_id);
-							t.count++;
-							tokensMap.put(represent, t);
+							t = new Token(token_id);
 						}
-						if (documentTokenMap.containsKey(review_id)) {
-							documentTokenMap.get(review_id).add(t);
-						} else {
-							documentTokenMap.put(review_id, new ArrayList<Token>());
-							documentTokenMap.get(review_id).add(t);
-						}
-						
+						t.documents.add(review_id);
+						t.count++;
+						tokensMap.put(token_id, t);
+						sesameDocument.tokenIds.add(token_id);
 						totalTokens++;
 					}
 				}
@@ -276,13 +278,12 @@ public class Main {
 	 * @param key they key in the object that will access the value to convert to array
 	 * @return a JsonArray data type
 	 */
-	static JsonArray bruteForceJsonArray(JsonObject object, String key) {
-	    if (object.get(key).isJsonArray()) {
-	        return object.get(key).getAsJsonArray();
+	static JsonArray bruteForceJsonArray(JsonObject jsonObject, String key) {
+	    if (jsonObject.get(key).isJsonArray()) {
+	        return jsonObject.get(key).getAsJsonArray();
 	    } else {
 	        JsonArray oneElementArray = new JsonArray();
-	        oneElementArray.add(object.get(key).getAsJsonObject());
-	        System.out.println(oneElementArray.toString());
+	        oneElementArray.add(jsonObject.get(key).getAsJsonObject());
 	        return oneElementArray;
 	    }
 	}
@@ -292,7 +293,7 @@ public class Main {
 	 * @return a list of all the unique categories
 	 */
 	static ArrayList<String> getDistinctLocationCategories() {
-		System.out.print("get distinct categories: ");
+		//System.out.print("get distinct categories: ");
 		ArrayList<String> list = new ArrayList<String>();
 		long start = System.currentTimeMillis();
 		MongoCursor<String> categories = locations.distinct("categories", String.class).iterator();
@@ -300,7 +301,7 @@ public class Main {
 			list.add(categories.next().toString());
 		}
 		long finish = System.currentTimeMillis();
-		System.out.println("elapsed " + (finish - start) + " ms, count " + list.size());
+		//System.out.println("elapsed " + (finish - start) + " ms, count " + list.size());
 		return list;
 	}
 	
@@ -310,7 +311,7 @@ public class Main {
 	 * @return a list of business IDs
 	 */
 	static ArrayList<String> getBusinessIdList(String category) {
-		System.out.print("get business ids: ");
+		//System.out.print("get business ids: ");
 		ArrayList<String> list = new ArrayList<String>();
 		long start = System.currentTimeMillis();
 		MongoCursor<Document> cursor = locations.find(eq("categories", category)).iterator();
@@ -318,7 +319,7 @@ public class Main {
 			list.add(cursor.next().getString("business_id"));
 		}
 		long finish = System.currentTimeMillis();
-		System.out.println("elapsed " + (finish - start) + " ms, count " + list.size());
+		//System.out.println("elapsed " + (finish - start) + " ms, count " + list.size());
 		return list;
 	}
 	
@@ -328,7 +329,7 @@ public class Main {
 	 * @return a list of review IDs
 	 */
 	static ArrayList<String> getBusinessReviewIdList(ArrayList<String> businessIdList) {
-		System.out.print("get review ids: ");
+		//System.out.print("get review ids: ");
 		ArrayList<String> list = new ArrayList<String>();
 		BasicDBObject filter = new BasicDBObject("$in", businessIdList);
 		BasicDBObject query = new BasicDBObject("business_id", filter);
@@ -338,7 +339,7 @@ public class Main {
 			list.add(cursor.next().getString("review_id"));
 		}
 		long finish = System.currentTimeMillis();
-		System.out.println("elapsed " + (finish - start) + " ms, count " + list.size());
+		//System.out.println("elapsed " + (finish - start) + " ms, count " + list.size());
 		return list;
 	}
 }

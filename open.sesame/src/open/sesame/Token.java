@@ -4,7 +4,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class Token implements Comparable<Token>{
-	public String representative;
+	public String id;
 	public String word;
 	public String lemma;
 	public String pos;
@@ -16,13 +16,13 @@ public class Token implements Comparable<Token>{
 	public Token() {
 		count++;
 	}
-	public Token(String rep) {
-		count++;
-		representative = rep;
+	//representative should be something like lemma:;:pos
+	public Token(String representative) {
+		id = representative;
 	}
 	@Override
 	public String toString() {
-		return representative;
+		return id;
 	}
 	@Override
 	public int compareTo(Token o) {

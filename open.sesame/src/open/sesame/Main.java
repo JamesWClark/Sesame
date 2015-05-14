@@ -31,9 +31,11 @@ import java.util.Set;
 
 import org.bson.Document;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.stream.JsonReader;
 import com.hankcs.lda.Corpus;
 import com.hankcs.lda.LdaGibbsSampler;
 import com.hankcs.lda.LdaUtil;
@@ -44,6 +46,8 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 
 public class Main {
+	
+	static final int VERSION = 1;
 	
 	static int totalDocuments = 0;
 	static int totalTokens = 0;
@@ -65,7 +69,7 @@ public class Main {
 	//stopwords
 	private static Set<String> stopwords = new HashSet<String>();
 	
-	public static void main(String[] args) {	
+	public static void main(String[] args) {
 		for(String arg : args) {
 			switch(args[0]) {
 			case "countCategories":
@@ -73,20 +77,17 @@ public class Main {
 				break;
 			case "tfidf":
 				loadStopWords("stopwords-long");
-				//can foreach on categories, but let's stay simple with sandwiches or other for now
-				//if doing a loop on categories, we need to reinitialize 
-				//tokensMap = new HashMap<>();
-				//documentsMap = new HashMap<>();
-				//String category = "Parking";		
 				ArrayList<String> categories = getDistinctLocationCategories();
 				Collections.sort(categories);
 				int currentCategory = 0;
 				for(String category : categories) {
+					tokensMap = new HashMap<>();
+					documentsMap = new HashMap<>();
 					ArrayList<String> businessIds = getBusinessIdList(category);
 					ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
 					totalDocuments = reviewIds.size();
 					processTokens(reviewIds, category, currentCategory++, categories.size());
-					tfidf(tokensMap);
+					tfidf(tokensMap, category);
 					ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
 					Collections.reverse(sortedTfidfTokens);
 					for(int i = 0; i < sortedTfidfTokens.size(); i++) {
@@ -178,7 +179,7 @@ public class Main {
 	 * Calculates a TFIDF score for categorical result set from MongoDB
 	 * @param tokensMap a HashMap of tokens
 	 */
-	static void tfidf(Map<String, Token> tokensMap) {
+	static void tfidf(Map<String, Token> tokensMap, String category) {
 		double maxTF = -1d;
 		
 		//1st pass through for general tf
@@ -191,6 +192,9 @@ public class Main {
 				maxTF = token.tf;
 		}
 		
+		StringBuilder json = new StringBuilder();
+		json.append("{'tfidf':{'version':" + VERSION + ",'category':'" + category + "','tokens':[");
+		
 		//2nd pass through for augmented tfidf
 		it = tokensMap.entrySet().iterator();
 		while(it.hasNext()) {
@@ -199,6 +203,19 @@ public class Main {
 			token.tf = 0.5 + ((0.5 * token.tf) / maxTF);
 			token.idf = Math.log10((double)totalDocuments / token.documents.size());
 			token.tfidf = token.tf * token.idf;
+			json.append("{'id':'" + token.id + "','score':" + token.tfidf + "}");
+			if(it.hasNext())
+				json.append(",");
+		}
+		json.append("]}}");
+		System.out.println(json.toString());
+		JsonParser parser = new JsonParser();
+		JsonObject jObject = (JsonObject)parser.parse(json.toString());
+		System.out.println(jObject.toString());
+		try {
+			Thread.sleep(15000);
+		} catch (Exception ex) {
+			
 		}
 	}
 	

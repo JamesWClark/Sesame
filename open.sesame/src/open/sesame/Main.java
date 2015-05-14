@@ -84,6 +84,7 @@ public class Main {
 				Collections.sort(categories);
 				int currentCategory = 0;
 				for(String category : categories) {
+					category = "Asian Fusion";
 					tokensMap = new HashMap<>();
 					documentsMap = new HashMap<>();
 					ArrayList<String> businessIds = getBusinessIdList(category);
@@ -211,10 +212,14 @@ public class Main {
 			
 			JsonToken jt = new JsonToken(token.id, token.tfidf);
 			Gson gson = new Gson();
-			String jsonToken = new Gson().toJson(jt);
-			json.append(jsonToken);
-			if(it.hasNext())
-				json.append(",");
+			try {
+				String jsonToken = new Gson().toJson(jt);
+				json.append(jsonToken);
+				if(it.hasNext())
+					json.append(",");
+			} catch (UnsupportedOperationException ex) {
+				//do nothing - this token needs to be skipped
+			}				
 		}
 		json.append("]}}");
 		System.out.println(json.toString());
@@ -291,23 +296,35 @@ public class Main {
 				
 				//foreach token
 				for(int k = 0; k < token.size(); k++) {
-					JsonObject tokenIndex = token.get(k).getAsJsonObject();
-					String pos = tokenIndex.get("POS").getAsString();
-					String lemma = tokenIndex.get("lemma").getAsString().toLowerCase();
-					String word = tokenIndex.get("word").getAsString();
-					
-					//increment non stop word tokens
-					if(!isStopWord(lemma) && !isPunctuationOrDigit(lemma) && !isNumeric(lemma)) {
-						String token_id = lemma + ":;:" + pos;
-						Token t = tokensMap.get(token_id);
-						if(null == t) {
-							t = new Token(token_id);
+					//this UnsupportedOperationException was first thrown in "Asian Fusion" category
+					try {
+						JsonObject tokenIndex = token.get(k).getAsJsonObject();
+						String pos = tokenIndex.get("POS").getAsString();
+						String lemma = tokenIndex.get("lemma").getAsString().toLowerCase();
+						String word = tokenIndex.get("word").getAsString();
+						
+						//increment non stop word tokens
+						if(!isStopWord(lemma) && !isPunctuationOrDigit(lemma) && !isNumeric(lemma)) {
+							String token_id = lemma + ":;:" + pos;
+							Token t = tokensMap.get(token_id);
+							if(null == t) {
+								t = new Token(token_id);
+							}
+							t.documents.add(review_id);
+							t.count++;
+							tokensMap.put(token_id, t);
+							review.tokenIds.add(token_id);
+							totalTokens++;
 						}
-						t.documents.add(review_id);
-						t.count++;
-						tokensMap.put(token_id, t);
-						review.tokenIds.add(token_id);
-						totalTokens++;
+					} catch (UnsupportedOperationException ex) {
+						//try logging it as an error
+						try {
+							PrintWriter errors = new PrintWriter("errors.log");
+							errors.println(ex.getStackTrace());
+							errors.println(ex.getMessage());
+						} catch (FileNotFoundException ex2) {
+							//i guess do nothing ??
+						}
 					}
 				}
 				

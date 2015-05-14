@@ -76,6 +76,9 @@ public class Main {
 			case "tfidf":
 				loadStopWords("stopwords-long");
 				//can foreach on categories, but let's stay simple with sandwiches or other for now
+				//if doing a loop on categories, we need to reinitialize 
+				//tokensMap = new HashMap<>();
+				//documentsMap = new HashMap<>();
 				String category = "Parking";		
 				ArrayList<String> categories = getDistinctLocationCategories();
 				ArrayList<String> businessIds = getBusinessIdList(category);
@@ -110,6 +113,15 @@ public class Main {
 			totalDocuments = reviewIds.size();
 			System.out.println(category + " : " + totalDocuments);
 		}
+	}
+	
+	public static boolean isNumeric(String wordOrLemma) {  
+		try {  
+			Double.parseDouble(wordOrLemma);  
+		} catch(NumberFormatException ex) {  
+			return false;  
+		}  
+		return true;  
 	}
 	
 	/**
@@ -237,8 +249,8 @@ public class Main {
 			JsonObject sentences = document.get("sentences").getAsJsonObject();
 			
 			String review_id = document.get("review_id").getAsString();
-			Review sesameDocument = new Review(review_id);
-			documentsMap.put(review_id, sesameDocument);
+			Review review = new Review(review_id);
+			documentsMap.put(review_id, review);
 			
 			JsonArray sentence = bruteForceJsonArray(sentences, "sentence");
 			//foreach sentence
@@ -255,7 +267,7 @@ public class Main {
 					String word = tokenIndex.get("word").getAsString();
 					
 					//increment non stop word tokens
-					if(false == isStopWord(lemma) && false == isPunctuation(lemma)) {
+					if(!isStopWord(lemma) && !isPunctuation(lemma) && !isNumeric(lemma)) {
 						String token_id = lemma + ":;:" + pos;
 						Token t = tokensMap.get(token_id);
 						if(null == t) {
@@ -264,7 +276,7 @@ public class Main {
 						t.documents.add(review_id);
 						t.count++;
 						tokensMap.put(token_id, t);
-						sesameDocument.tokenIds.add(token_id);
+						review.tokenIds.add(token_id);
 						totalTokens++;
 					}
 				}

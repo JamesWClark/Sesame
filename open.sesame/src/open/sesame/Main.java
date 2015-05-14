@@ -29,13 +29,15 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import open.sesame.json.buckets.JsonToken;
+
 import org.bson.Document;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.MalformedJsonException;
 import com.hankcs.lda.Corpus;
 import com.hankcs.lda.LdaGibbsSampler;
 import com.hankcs.lda.LdaUtil;
@@ -203,7 +205,11 @@ public class Main {
 			token.tf = 0.5 + ((0.5 * token.tf) / maxTF);
 			token.idf = Math.log10((double)totalDocuments / token.documents.size());
 			token.tfidf = token.tf * token.idf;
-			json.append("{'id':'" + token.id + "','score':" + token.tfidf + "}");
+			
+			JsonToken jt = new JsonToken(token.id, token.tfidf);
+			Gson gson = new Gson();
+			String jsonToken = new Gson().toJson(jt);
+			json.append(jsonToken);
 			if(it.hasNext())
 				json.append(",");
 		}

@@ -18,8 +18,10 @@ import static com.mongodb.client.model.Filters.eq;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,7 +39,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.stream.MalformedJsonException;
 import com.hankcs.lda.Corpus;
 import com.hankcs.lda.LdaGibbsSampler;
 import com.hankcs.lda.LdaUtil;
@@ -92,10 +93,12 @@ public class Main {
 					tfidf(tokensMap, category);
 					ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
 					Collections.reverse(sortedTfidfTokens);
+					/*
 					for(int i = 0; i < sortedTfidfTokens.size(); i++) {
 						Token t = sortedTfidfTokens.get(i);
 						System.out.println(t + ": " + t.tfidf);
 					}
+					*/
 				}
 				break;
 			case "lda":
@@ -217,11 +220,12 @@ public class Main {
 		System.out.println(json.toString());
 		JsonParser parser = new JsonParser();
 		JsonObject jObject = (JsonObject)parser.parse(json.toString());
-		System.out.println(jObject.toString());
+		
 		try {
-			Thread.sleep(15000);
-		} catch (Exception ex) {
-			
+			PrintWriter writer = new PrintWriter(category + ".json");
+			writer.write(jObject.toString());
+		} catch (FileNotFoundException ex) {
+			//do nothing?
 		}
 	}
 	

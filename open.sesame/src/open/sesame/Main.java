@@ -28,6 +28,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.bson.Document;
 
@@ -65,29 +67,34 @@ public class Main {
 	//stopwords
 	private static Set<String> stopwords = new HashSet<String>();
 	
-	public static void main(String[] args) {
-		loadStopWords("stopwords-long");
-		
-		//can foreach on categories, but let's stay simple with sandwiches or other for now
-		String category = "Medical Centers";		
-		
-		ArrayList<String> categories = getDistinctLocationCategories();
-		ArrayList<String> businessIds = getBusinessIdList(category);
-		ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
-		
-		totalDocuments = reviewIds.size();
-		
-		processTokens(reviewIds);
-		tfidf(tokensMap);
-		ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
-		Collections.sort(sortedTfidfTokens);
-		
-		for(int i = 0; i < sortedTfidfTokens.size(); i++) {
-			Token t = sortedTfidfTokens.get(i);
-			System.out.println(t + ": " + t.tfidf);
+	public static void main(String[] args) {	
+		for(String arg : args) {
+			switch(args[0]) {
+			case "countCategories":
+				printReviewCountsByCategory();
+				break;
+			case "tfidf":
+				loadStopWords("stopwords-long");
+				//can foreach on categories, but let's stay simple with sandwiches or other for now
+				String category = "Parking";		
+				ArrayList<String> categories = getDistinctLocationCategories();
+				ArrayList<String> businessIds = getBusinessIdList(category);
+				ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
+				totalDocuments = reviewIds.size();
+				processTokens(reviewIds);
+				tfidf(tokensMap);
+				ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
+				Collections.sort(sortedTfidfTokens);
+				for(int i = 0; i < sortedTfidfTokens.size(); i++) {
+					Token t = sortedTfidfTokens.get(i);
+					System.out.println(t + ": " + t.tfidf);
+				}
+				break;
+			case "lda":
+				lda(documentsMap, 10, 2.0);
+				break;
+			}
 		}
-
-		lda(documentsMap, 10, 2.0);
 
 		mongo.close();
 	}
@@ -102,6 +109,26 @@ public class Main {
 			ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
 			totalDocuments = reviewIds.size();
 			System.out.println(category + " : " + totalDocuments);
+		}
+	}
+	
+	/**
+	 * Check if a token starts with a single punctuation
+	 * @param wordOrLemma A representative of the token to check
+	 * @return true if yes, false if no
+	 */
+	static boolean isPunctuation(String wordOrLemma) {
+		if(wordOrLemma.length() > 0) {
+			Pattern p = Pattern.compile("[\\p{Punct}]", Pattern.UNICODE_CHARACTER_CLASS);
+			Matcher m = p.matcher(wordOrLemma.substring(0,1)); 
+			if (m.find()) {
+				return true;
+			}
+			else { 
+				return false;
+			}
+		} else {
+			return false;
 		}
 	}
 	
@@ -161,6 +188,12 @@ public class Main {
 		}
 	}
 	
+	/**
+	 * Get related topics with Latent Dirichlet Allocation
+	 * @param documentsMap a map of document IDs, relating to Yelp reviews
+	 * @param K the number of topics in which to group related terms
+	 * @param tfidfThreshold the minimum value for below which to exclude tokens from LDA
+	 */
 	static void lda(Map<String, Review> documentsMap, int K, double tfidfThreshold) {
 		Corpus corpus = new Corpus();
 		for (String review_id: documentsMap.keySet()) {
@@ -222,7 +255,7 @@ public class Main {
 					String word = tokenIndex.get("word").getAsString();
 					
 					//increment non stop word tokens
-					if(false == isStopWord(lemma)) {
+					if(false == isStopWord(lemma) && false == isPunctuation(lemma)) {
 						String token_id = lemma + ":;:" + pos;
 						Token t = tokensMap.get(token_id);
 						if(null == t) {
@@ -249,11 +282,7 @@ public class Main {
 				}
 				*/
 			}
-		
-			//this problem exists in our data (observed in coref) : 
-			//stackoverflow.com/questions/1823264/quickest-way-to-convert-xml-to-json-in-java#answer-15015482
-			//the following block is written for json style : http://jsonmate.com/permalink/554839d0aa522bae3683ee34
-			
+
 			/*
 			//coreference resolution
 			JsonObject coreferenceObject = document.get("coreference").getAsJsonObject();

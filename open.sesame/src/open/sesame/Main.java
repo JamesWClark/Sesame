@@ -28,8 +28,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.bson.Document;
 
@@ -79,18 +77,22 @@ public class Main {
 				//if doing a loop on categories, we need to reinitialize 
 				//tokensMap = new HashMap<>();
 				//documentsMap = new HashMap<>();
-				String category = "Parking";		
+				//String category = "Parking";		
 				ArrayList<String> categories = getDistinctLocationCategories();
-				ArrayList<String> businessIds = getBusinessIdList(category);
-				ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
-				totalDocuments = reviewIds.size();
-				processTokens(reviewIds);
-				tfidf(tokensMap);
-				ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
-				Collections.sort(sortedTfidfTokens);
-				for(int i = 0; i < sortedTfidfTokens.size(); i++) {
-					Token t = sortedTfidfTokens.get(i);
-					System.out.println(t + ": " + t.tfidf);
+				Collections.sort(categories);
+				int currentCategory = 0;
+				for(String category : categories) {
+					ArrayList<String> businessIds = getBusinessIdList(category);
+					ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
+					totalDocuments = reviewIds.size();
+					processTokens(reviewIds, category, currentCategory++, categories.size());
+					tfidf(tokensMap);
+					ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
+					Collections.reverse(sortedTfidfTokens);
+					for(int i = 0; i < sortedTfidfTokens.size(); i++) {
+						Token t = sortedTfidfTokens.get(i);
+						System.out.println(t + ": " + t.tfidf);
+					}
 				}
 				break;
 			case "lda":
@@ -134,7 +136,7 @@ public class Main {
 	 * @param wordOrLemma A representative of the token to check
 	 * @return true if yes, false if no
 	 */
-	static boolean isPunctuation(String wordOrLemma) {
+	static boolean isPunctuationOrDigit(String wordOrLemma) {
 		if(wordOrLemma.length() > 0)
 			if(Character.isLetter(wordOrLemma.charAt(0)))
 				return false;
@@ -227,7 +229,7 @@ public class Main {
 	 * Process token values from the corenlp result set
 	 * @param reviewIdList a list of review IDs from the reviews collection
 	 */
-	static void processTokens(ArrayList<String> reviewIdList) {
+	static void processTokens(ArrayList<String> reviewIdList, String category, int categoryCount, int totalCategories) {
 		System.out.print("get review nlp: ");
 		BasicDBObject filter = new BasicDBObject("$in", reviewIdList);
 		BasicDBObject query = new BasicDBObject("root.document.review_id", filter);
@@ -236,10 +238,11 @@ public class Main {
 		
 		//foreach document
 		int cursorCount = 0;
+		int remaining = totalCategories - categoryCount;
 		while(cursor.hasNext()) {
 			
 			//visual marker in console log
-			System.out.println("progress: " + cursorCount++ + " / " + totalDocuments);
+			System.out.println("category: " + category + ", categories togo: " + remaining + ", category progress: " + cursorCount++ + " / " + totalDocuments);
 			
 			Document corejson = cursor.next();
 			String json = corejson.toJson();
@@ -267,7 +270,7 @@ public class Main {
 					String word = tokenIndex.get("word").getAsString();
 					
 					//increment non stop word tokens
-					if(!isStopWord(lemma) && !isPunctuation(lemma) && !isNumeric(lemma)) {
+					if(!isStopWord(lemma) && !isPunctuationOrDigit(lemma) && !isNumeric(lemma)) {
 						String token_id = lemma + ":;:" + pos;
 						Token t = tokensMap.get(token_id);
 						if(null == t) {

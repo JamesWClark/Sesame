@@ -115,6 +115,11 @@ public class Main {
 		}
 	}
 	
+	/**
+	 * Checks if an entire string is numeric
+	 * @param wordOrLemma String to check
+	 * @return true if yes, false if no
+	 */
 	public static boolean isNumeric(String wordOrLemma) {  
 		try {  
 			Double.parseDouble(wordOrLemma);  
@@ -130,18 +135,13 @@ public class Main {
 	 * @return true if yes, false if no
 	 */
 	static boolean isPunctuation(String wordOrLemma) {
-		if(wordOrLemma.length() > 0) {
-			Pattern p = Pattern.compile("[\\p{Punct}]", Pattern.UNICODE_CHARACTER_CLASS);
-			Matcher m = p.matcher(wordOrLemma.substring(0,1)); 
-			if (m.find()) {
-				return true;
-			}
-			else { 
+		if(wordOrLemma.length() > 0)
+			if(Character.isLetter(wordOrLemma.charAt(0)))
 				return false;
-			}
-		} else {
+			else 
+				return true;
+		else
 			return false;
-		}
 	}
 	
 	/**
@@ -263,7 +263,7 @@ public class Main {
 				for(int k = 0; k < token.size(); k++) {
 					JsonObject tokenIndex = token.get(k).getAsJsonObject();
 					String pos = tokenIndex.get("POS").getAsString();
-					String lemma = tokenIndex.get("lemma").getAsString();
+					String lemma = tokenIndex.get("lemma").getAsString().toLowerCase();
 					String word = tokenIndex.get("word").getAsString();
 					
 					//increment non stop word tokens

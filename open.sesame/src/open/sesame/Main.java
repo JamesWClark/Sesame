@@ -19,10 +19,12 @@ import static com.mongodb.client.model.Filters.eq;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -81,25 +83,28 @@ public class Main {
 			case "tfidf":
 				loadStopWords("stopwords-long");
 				ArrayList<String> categories = getDistinctLocationCategories();
+				ArrayList<File> filesInWorkingDirectory = new ArrayList<File>(Arrays.asList(new File(System.getProperty("user.dir")).listFiles()));
 				Collections.sort(categories);
 				int currentCategory = 0;
 				for(String category : categories) {
-					category = "Asian Fusion";
-					tokensMap = new HashMap<>();
-					documentsMap = new HashMap<>();
-					ArrayList<String> businessIds = getBusinessIdList(category);
-					ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
-					totalDocuments = reviewIds.size();
-					processTokens(reviewIds, category, currentCategory++, categories.size());
-					tfidf(tokensMap, category);
-					ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
-					Collections.reverse(sortedTfidfTokens);
-					/*
-					for(int i = 0; i < sortedTfidfTokens.size(); i++) {
-						Token t = sortedTfidfTokens.get(i);
-						System.out.println(t + ": " + t.tfidf);
+					currentCategory++;
+					if(false == categoryFileExists(filesInWorkingDirectory, category)) {
+						tokensMap = new HashMap<>();
+						documentsMap = new HashMap<>();
+						ArrayList<String> businessIds = getBusinessIdList(category);
+						ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
+						totalDocuments = reviewIds.size();
+						processTokens(reviewIds, category, currentCategory, categories.size());
+						tfidf(tokensMap, category);
+						ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
+						Collections.reverse(sortedTfidfTokens);
+						/*//print sorted tfidf tokens and scores
+						for(int i = 0; i < sortedTfidfTokens.size(); i++) {
+							Token t = sortedTfidfTokens.get(i);
+							System.out.println(t + ": " + t.tfidf);
+						}
+						*/
 					}
-					*/
 				}
 				break;
 			case "lda":
@@ -109,6 +114,15 @@ public class Main {
 		}
 
 		mongo.close();
+	}
+	
+	static boolean categoryFileExists(ArrayList<File> files, String category) {
+		for(File f : files) {
+			if(f.getName().equals(category + ".json")) {
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	/**
@@ -218,8 +232,15 @@ public class Main {
 				if(it.hasNext())
 					json.append(",");
 			} catch (UnsupportedOperationException ex) {
-				//do nothing - this token needs to be skipped
-			}				
+				try {
+					PrintWriter errors = new PrintWriter(new FileOutputStream(new File("errors.log")), true);
+					errors.println(ex.getStackTrace());
+					errors.println(ex.getMessage());
+					errors.close();
+				} catch (FileNotFoundException ex2) {
+					//i guess do nothing ??
+				}
+			}
 		}
 		json.append("]}}");
 		System.out.println(json.toString());
@@ -319,9 +340,10 @@ public class Main {
 					} catch (UnsupportedOperationException ex) {
 						//try logging it as an error
 						try {
-							PrintWriter errors = new PrintWriter("errors.log");
+							PrintWriter errors = new PrintWriter(new FileOutputStream(new File("errors.log")), true);
 							errors.println(ex.getStackTrace());
 							errors.println(ex.getMessage());
+							errors.close();
 						} catch (FileNotFoundException ex2) {
 							//i guess do nothing ??
 						}

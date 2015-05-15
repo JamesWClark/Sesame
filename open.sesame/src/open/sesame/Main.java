@@ -101,6 +101,7 @@ public class Main {
 				}
 				break;
 			case "lda":
+				//documentsMap = loadMapsFromFile()
 				lda(documentsMap, 10, 2.0);
 				break;
 			}
@@ -109,6 +110,12 @@ public class Main {
 		mongo.close();
 	}
 	
+	/**
+	 * Check for existence of a previously processed category result file
+	 * @param files
+	 * @param category
+	 * @return
+	 */
 	static boolean categoryFileExists(ArrayList<File> files, String category) {
 		for(File f : files) {
 			if(f.getName().equals(category + CATEGORY_FILE_EXTENSION)) {
@@ -353,7 +360,14 @@ public class Main {
 			PrintWriter tsv = new PrintWriter(category + CATEGORY_FILE_EXTENSION);	
 			for(int i = 0; i < sortedTfidfTokens.size(); i++) {
 				Token token = sortedTfidfTokens.get(i);
-				tsv.println(token.id + "\t" + token.tfidf);
+				tsv.print(token.id + "\t" + token.tfidf + "\t");
+				Iterator it = token.documents.iterator();
+				while (it.hasNext()) {
+				    tsv.print(it.next());
+				    if(it.hasNext())
+				    	tsv.print(",");
+				}
+				tsv.print("\n");
 			}
 			tsv.close();
 		} catch (FileNotFoundException ex) {

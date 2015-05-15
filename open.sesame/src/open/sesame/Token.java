@@ -12,7 +12,7 @@ public class Token implements Comparable<Token>{
 	public double tf;
 	public double idf;
 	public double tfidf;
-	public Set<String> documents = new HashSet<String>();;
+	public Set<String> documents = new HashSet<String>();
 	public Token() {
 		count++;
 	}
@@ -27,10 +27,10 @@ public class Token implements Comparable<Token>{
 	@Override
 	public int compareTo(Token o) {
 		if(this.tfidf > o.tfidf)
-			return -1;
+			return 1;
 		else if (this.tfidf == o.tfidf)
 			return 0;
 		else
-			return 1;
+			return -1;
 	}
 }

@@ -18,8 +18,10 @@ import static com.mongodb.client.model.Filters.eq;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,11 +30,13 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
+import open.sesame.json.buckets.JsonToken;
+import open.sesame.tsv.read.TSVReader;
 
 import org.bson.Document;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -47,6 +51,8 @@ import com.mongodb.client.MongoDatabase;
 
 public class Main {
 	
+	static final int VERSION = 1;
+	
 	static int totalDocuments = 0;
 	static int totalTokens = 0;
 
@@ -60,6 +66,8 @@ public class Main {
 	//for tfidf
 	private static Map<String, Token> tokensMap = new HashMap<>();
 	private static Map<String, Review> documentsMap = new HashMap<>();
+	//json representation of TFIDF
+//	private static ArrayList<JsonToken> jsonTokenList = new ArrayList();
 	
 	//LDA
 	private static HashMap<String, Double>[] topicMap;
@@ -67,27 +75,48 @@ public class Main {
 	//stopwords
 	private static Set<String> stopwords = new HashSet<String>();
 	
-	public static void main(String[] args) {	
+	public static void main(String[] args) throws Exception {
 		for(String arg : args) {
 			switch(args[0]) {
 			case "countCategories":
 				printReviewCountsByCategory();
 				break;
+//			case "jsontfidf":
+//				JsonParserFactory.readJsonToObjects("C:\\Users\\Jordan\\Documents\\GitHub\\Sesame\\open.sesame\\data\\Afghan.json");
+//				
+//				break;
+			case "tsvread":
+				String filepath = "D:\\Yelp-Dataset\\Sesame Out\\Accountants.tsv";
+				ldaFromTsv(filepath, 10, 0.65);
+				break;
 			case "tfidf":
 				loadStopWords("stopwords-long");
-				//can foreach on categories, but let's stay simple with sandwiches or other for now
-				String category = "Chinese";		
 				ArrayList<String> categories = getDistinctLocationCategories();
-				ArrayList<String> businessIds = getBusinessIdList(category);
-				ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
-				totalDocuments = reviewIds.size();
-				processTokens(reviewIds);
-				tfidf(tokensMap);
-				ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
-				Collections.sort(sortedTfidfTokens);
-				for(int i = 0; i < sortedTfidfTokens.size(); i++) {
-					Token t = sortedTfidfTokens.get(i);
-					System.out.println(t + ": " + t.tfidf);
+				Collections.sort(categories);
+				int currentCategory = 0;
+				for(String category : categories) {
+					category = "Asian Fusion";
+					tokensMap = new HashMap<>();
+					documentsMap = new HashMap<>();
+					ArrayList<String> businessIds = getBusinessIdList(category);
+					ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
+					totalDocuments = reviewIds.size();
+					processTokens(reviewIds, category, currentCategory++, categories.size());
+					tfidf(tokensMap, category);
+					ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
+					Collections.reverse(sortedTfidfTokens);
+					
+					/*
+					for(int i = 0; i < sortedTfidfTokens.size(); i++) {
+						Token t = sortedTfidfTokens.get(i);
+						System.out.println(t + ": " + t.tfidf);
+					}
+					*/
+					int p = 5;
+					p+=5;
+					lda(documentsMap, 12, 0.65);
+
+					
 				}
 //				break;
 //			case "lda":
@@ -113,40 +142,32 @@ public class Main {
 	}
 	
 	/**
+	 * Checks if an entire string is numeric
+	 * @param wordOrLemma String to check
+	 * @return true if yes, false if no
+	 */
+	public static boolean isNumeric(String wordOrLemma) {  
+		try {  
+			Double.parseDouble(wordOrLemma);  
+		} catch(NumberFormatException ex) {  
+			return false;  
+		}  
+		return true;  
+	}
+	
+	/**
 	 * Check if a token starts with a single punctuation
 	 * @param wordOrLemma A representative of the token to check
 	 * @return true if yes, false if no
 	 */
-	static boolean isPunctuation(String wordOrLemma) {
-		if(wordOrLemma.length() > 0) {
-			Pattern p = Pattern.compile("[\\p{Punct}]", Pattern.UNICODE_CHARACTER_CLASS);
-			Matcher m = p.matcher(wordOrLemma.substring(0,1)); 
-			if (m.find()) {
-				return true;
-			}
-			else { 
+	static boolean isPunctuationOrDigit(String wordOrLemma) {
+		if(wordOrLemma.length() > 0)
+			if(Character.isLetter(wordOrLemma.charAt(0)))
 				return false;
-			}
-		} else {
+			else 
+				return true;
+		else
 			return false;
-		}
-	}
-	
-    /**
-     * Check if a word or lemma begins with a single punctuation mark or a number.
-     * @param wordOrLemma
-     * @return
-     */
-	static boolean isNonAlphanumeric(String wordOrLemma) {
-		if (wordOrLemma.length() > 0) {
-			Pattern p = Pattern.compile("[^\\w]");
-		    Matcher m = p.matcher(wordOrLemma.substring(0,1));
-		    if (m.find()) {
-		    	return true;
-		    }
-		} 
-	    return false;
-		
 	}
 	
 	/**
@@ -155,7 +176,7 @@ public class Main {
 	 * @return true if yes, false if no
 	 */
 	static boolean isStopWord(String wordOrLemma) {
-		if(stopwords.contains(wordOrLemma.toLowerCase()))
+		if(stopwords.contains(wordOrLemma))
 			return true;
 		else 
 			return false;
@@ -181,7 +202,7 @@ public class Main {
 	 * Calculates a TFIDF score for categorical result set from MongoDB
 	 * @param tokensMap a HashMap of tokens
 	 */
-	static void tfidf(Map<String, Token> tokensMap) {
+	static void tfidf(Map<String, Token> tokensMap, String category) {
 		double maxTF = -1d;
 		
 		//1st pass through for general tf
@@ -194,6 +215,9 @@ public class Main {
 				maxTF = token.tf;
 		}
 		
+		StringBuilder json = new StringBuilder();
+		json.append("{'tfidf':{'version':" + VERSION + ",'category':'" + category + "','tokens':[");
+		
 		//2nd pass through for augmented tfidf
 		it = tokensMap.entrySet().iterator();
 		while(it.hasNext()) {
@@ -202,8 +226,31 @@ public class Main {
 			token.tf = 0.5 + ((0.5 * token.tf) / maxTF);
 			token.idf = Math.log10((double)totalDocuments / token.documents.size());
 			token.tfidf = token.tf * token.idf;
+			
+			JsonToken jt = new JsonToken(token.id, token.tfidf);
+			Gson gson = new Gson();
+			try {
+				String jsonToken = new Gson().toJson(jt);
+				json.append(jsonToken);
+				if(it.hasNext())
+					json.append(",");
+			} catch (UnsupportedOperationException ex) {
+				//do nothing - this token needs to be skipped
+			}				
+		}
+		json.append("]}}");
+		System.out.println(json.toString());
+		JsonParser parser = new JsonParser();
+		JsonObject jObject = (JsonObject)parser.parse(json.toString());
+		
+		try {
+			PrintWriter writer = new PrintWriter(category + ".json");
+			writer.write(jObject.toString());
+		} catch (FileNotFoundException ex) {
+			//do nothing?
 		}
 	}
+	
 	
 	/**
 	 * Get related topics with Latent Dirichlet Allocation
@@ -216,7 +263,32 @@ public class Main {
 		for (String review_id: documentsMap.keySet()) {
 			ArrayList<String> document = new ArrayList<String>();
 			for(String token_id : documentsMap.get(review_id).tokenIds) {
-				document.add(tokensMap.get(token_id).toString());
+				Token token = tokensMap.get(token_id);
+				if (token.tfidf > tfidfThreshold) {
+					document.add(tokensMap.get(token_id).toString());
+				}
+			}
+			if(document.size() > 0)
+				corpus.addDocument(document);
+		}
+		LdaGibbsSampler ldaGibbsSampler = new LdaGibbsSampler(corpus.getDocument(), corpus.getVocabularySize());
+		ldaGibbsSampler.gibbs(K);
+		double[][] phi = ldaGibbsSampler.getPhi();
+		Map<String, Double>[] topicMap = LdaUtil.translate(phi, corpus.getVocabulary(), K);
+		LdaUtil.explain(topicMap);
+	}
+	
+	static void ldaFromTsv(String filepath, int K, double tfidfThreshold) {
+		Corpus corpus = new Corpus();
+		TSVReader tsvReader = new TSVReader(filepath);
+		ArrayList<String> document = new ArrayList<String>();
+		HashMap<String, ReviewWithTokens> reviewsWithTokens = tsvReader.getReviewsWithTokens();
+		for (String review_id: reviewsWithTokens.keySet()) {
+			ArrayList<JsonToken> tokens = reviewsWithTokens.get(review_id).getTokens();
+			for (JsonToken token: tokens) {
+				if (token.getTfidf() > tfidfThreshold) {
+					document.add(token.getId());
+				}
 			}
 			if(document.size() > 0)
 				corpus.addDocument(document);
@@ -229,10 +301,28 @@ public class Main {
 	}
 	
 	/**
+	 * Saving this method for potential use in the future. right now a threshold is constant across the board at 0.6.
+	 * However, some reviews might have low TFIDFs or a very large number of tokens.
+	 * @param review
+	 * @return
+	 */
+	static double getDocumentTfidfThreshold(Review review) {
+		final double thresholdStandard = 0.6;
+		double averageTfidf, sumTfidf;
+		sumTfidf = 0.0;
+		for (String id: review.tokenIds) {
+			Token t = tokensMap.get(id);
+			sumTfidf += t.tfidf;
+		}
+		averageTfidf = sumTfidf / review.tokenIds.size();
+		return (averageTfidf > thresholdStandard ? averageTfidf : thresholdStandard);
+	}
+	
+	/**
 	 * Process token values from the corenlp result set
 	 * @param reviewIdList a list of review IDs from the reviews collection
 	 */
-	static void processTokens(ArrayList<String> reviewIdList) {
+	static void processTokens(ArrayList<String> reviewIdList, String category, int categoryCount, int totalCategories) {
 		System.out.print("get review nlp: ");
 		BasicDBObject filter = new BasicDBObject("$in", reviewIdList);
 		BasicDBObject query = new BasicDBObject("root.document.review_id", filter);
@@ -241,10 +331,11 @@ public class Main {
 		
 		//foreach document
 		int cursorCount = 0;
+		int remaining = totalCategories - categoryCount;
 		while(cursor.hasNext()) {
 			
 			//visual marker in console log
-			System.out.println("progress: " + cursorCount++ + " / " + totalDocuments);
+			System.out.println("category: " + category + ", categories togo: " + remaining + ", category progress: " + cursorCount++ + " / " + totalDocuments);
 			
 			Document corejson = cursor.next();
 			String json = corejson.toJson();
@@ -254,8 +345,8 @@ public class Main {
 			JsonObject sentences = document.get("sentences").getAsJsonObject();
 			
 			String review_id = document.get("review_id").getAsString();
-			Review sesameDocument = new Review(review_id);
-			
+			Review review = new Review(review_id);
+			documentsMap.put(review_id, review);
 			
 			JsonArray sentence = bruteForceJsonArray(sentences, "sentence");
 			//foreach sentence
@@ -266,25 +357,35 @@ public class Main {
 				
 				//foreach token
 				for(int k = 0; k < token.size(); k++) {
-					JsonObject tokenIndex = token.get(k).getAsJsonObject();
-					String pos = tokenIndex.get("POS").getAsString();
-					String lemma = tokenIndex.get("lemma").getAsString();
-					String word = tokenIndex.get("word").getAsString();
-					
-					//increment non stop word tokens
-					if(false == isStopWord(lemma) && false == isNonAlphanumeric(lemma)) {
-						String token_id = lemma + ":;:" + pos;
-						Token t = tokensMap.get(token_id);
-						if(null == t) {
-							t = new Token(token_id);
-						}
-						t.documents.add(review_id);
-						t.count++;
-						tokensMap.put(token_id, t);
+					//this UnsupportedOperationException was first thrown in "Asian Fusion" category
+					try {
+						JsonObject tokenIndex = token.get(k).getAsJsonObject();
+						String pos = tokenIndex.get("POS").getAsString();
+						String lemma = tokenIndex.get("lemma").getAsString().toLowerCase();
+						String word = tokenIndex.get("word").getAsString();
 						
-						sesameDocument.tokenIds.add(token_id);
-						documentsMap.put(review_id, sesameDocument);
-						totalTokens++;
+						//increment non stop word tokens
+						if(!isStopWord(lemma) && !isPunctuationOrDigit(lemma) && !isNumeric(lemma)) {
+							String token_id = lemma + ":;:" + pos;
+							Token t = tokensMap.get(token_id);
+							if(null == t) {
+								t = new Token(token_id);
+							}
+							t.documents.add(review_id);
+							t.count++;
+							tokensMap.put(token_id, t);
+							review.tokenIds.add(token_id);
+							totalTokens++;
+						}
+					} catch (UnsupportedOperationException ex) {
+						//try logging it as an error
+						try {
+							PrintWriter errors = new PrintWriter("errors.log");
+							errors.println(ex.getStackTrace());
+							errors.println(ex.getMessage());
+						} catch (FileNotFoundException ex2) {
+							//i guess do nothing ??
+						}
 					}
 				}
 				

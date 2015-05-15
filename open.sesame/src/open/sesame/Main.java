@@ -18,11 +18,15 @@ import static com.mongodb.client.model.Filters.eq;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -73,17 +77,20 @@ public class Main {
 	private static Set<String> stopwords = new HashSet<String>();
 	
 	public static void main(String[] args) {
+
+		loadStopWords("stopwords-long");
+		ArrayList<String> categories = getDistinctLocationCategories();
+		ArrayList<File> filesInWorkingDirectory = new ArrayList<File>(Arrays.asList(new File(System.getProperty("user.dir")).listFiles()));
+		Collections.sort(categories);
+		int currentCategory = 0;
+		
 		for(String arg : args) {
 			switch(args[0]) {
 			case "countCategories":
 				printReviewCountsByCategory();
 				break;
 			case "tfidf":
-				loadStopWords("stopwords-long");
-				ArrayList<String> categories = getDistinctLocationCategories();
-				ArrayList<File> filesInWorkingDirectory = new ArrayList<File>(Arrays.asList(new File(System.getProperty("user.dir")).listFiles()));
-				Collections.sort(categories);
-				int currentCategory = 0;
+				currentCategory = 0;
 				for(String category : categories) {
 					currentCategory++;
 					if(false == categoryFileExists(filesInWorkingDirectory, category)) {
@@ -101,13 +108,59 @@ public class Main {
 				}
 				break;
 			case "lda":
-				//documentsMap = loadMapsFromFile()
-				lda(documentsMap, 10, 2.0);
+				int K = Integer.parseInt(args[1]);
+				double threshold = Double.parseDouble(args[2]);				
+				currentCategory = 0;
+				for(String category : categories) {
+					if(true == categoryFileExists(filesInWorkingDirectory, category)) {
+						currentCategory++;
+						documentsMap = loadDocumentsMapFromFile(category + CATEGORY_FILE_EXTENSION, threshold);
+						lda(documentsMap, K);
+					}
+				}
 				break;
 			}
 		}
 
 		mongo.close();
+	}
+	
+	/**
+	 * Loads a TSV file into documentsMap - accounts for threshold
+	 * @param fileName
+	 * @param threshold
+	 * @return
+	 */
+	static Map<String, Review> loadDocumentsMapFromFile(String fileName, double threshold) {
+		Map<String, Review> tempMap = new HashMap<>();
+		try {
+			String line;
+		    InputStream fis = new FileInputStream(fileName);
+		    InputStreamReader isr = new InputStreamReader(fis, Charset.forName("UTF-8"));
+		    BufferedReader br = new BufferedReader(isr);
+		    while ((line = br.readLine()) != null) {
+		    	String[] stuff = line.split("\t");
+		    	String token_id = stuff[0];
+		    	double score = Double.parseDouble(stuff[1]);
+		    	if(score >= threshold) {
+			    	String[] review_ids = stuff[2].split(",");
+			    	for(int i = 0; i < review_ids.length; i++) {
+			    		String review_id = review_ids[i];
+			    		if(tempMap.containsKey(review_id)) {
+			    			Review review = tempMap.get(review_id);
+			    			review.tokenIds.add(token_id);
+			    		} else {
+			    			Review review = new Review(review_ids[i]);
+				    		review.tokenIds.add(token_id);
+				    		tempMap.put(review_id, review);
+			    		}
+			    	}
+		    	}
+		    }
+		    return tempMap;
+		} catch (IOException ex) {
+			return null;
+		}
 	}
 	
 	/**
@@ -143,7 +196,7 @@ public class Main {
 	 * @param wordOrLemma String to check
 	 * @return true if yes, false if no
 	 */
-	public static boolean isNumeric(String wordOrLemma) {  
+	static boolean isNumeric(String wordOrLemma) {  
 		try {  
 			Double.parseDouble(wordOrLemma);  
 		} catch(NumberFormatException ex) {  
@@ -224,17 +277,40 @@ public class Main {
 	}
 	
 	/**
-	 * Get related topics with Latent Dirichlet Allocation
+	 * For use with inline TFIDF result: Get related topics with Latent Dirichlet Allocation
 	 * @param documentsMap a map of document IDs, relating to Yelp reviews
 	 * @param K the number of topics in which to group related terms
 	 * @param tfidfThreshold the minimum value for below which to exclude tokens from LDA
 	 */
-	static void lda(Map<String, Review> documentsMap, int K, double tfidfThreshold) {
+	static void inlinelda(Map<String, Review> documentsMap, int K, double tfidfThreshold) {
 		Corpus corpus = new Corpus();
 		for (String review_id: documentsMap.keySet()) {
 			ArrayList<String> document = new ArrayList<String>();
 			for(String token_id : documentsMap.get(review_id).tokenIds) {
 				document.add(tokensMap.get(token_id).toString());
+			}
+			if(document.size() > 0)
+				corpus.addDocument(document);
+		}
+		LdaGibbsSampler ldaGibbsSampler = new LdaGibbsSampler(corpus.getDocument(), corpus.getVocabularySize());
+		ldaGibbsSampler.gibbs(K);
+		double[][] phi = ldaGibbsSampler.getPhi();
+		Map<String, Double>[] topicMap = LdaUtil.translate(phi, corpus.getVocabulary(), K);
+		LdaUtil.explain(topicMap);
+	}
+	
+	/**
+	 * For use on a preprocessed TFIDF saved to TSV file
+	 * @param documentsMap
+	 * @param K
+	 * @param tfidfThreshold
+	 */
+	static void lda(Map<String, Review> documentsMap, int K) {
+		Corpus corpus = new Corpus();
+		for (String review_id: documentsMap.keySet()) {
+			ArrayList<String> document = new ArrayList<String>();
+			for(String token_id : documentsMap.get(review_id).tokenIds) {
+				document.add(token_id);
 			}
 			if(document.size() > 0)
 				corpus.addDocument(document);

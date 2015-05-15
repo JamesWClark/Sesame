@@ -33,11 +33,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import open.sesame.json.buckets.JsonToken;
-
 import org.bson.Document;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -53,6 +50,7 @@ import com.mongodb.client.MongoDatabase;
 public class Main {
 	
 	static final int VERSION = 1;
+	static final String CATEGORY_FILE_EXTENSION = ".tsv";
 	
 	static int totalDocuments = 0;
 	static int totalTokens = 0;
@@ -97,13 +95,8 @@ public class Main {
 						processTokens(reviewIds, category, currentCategory, categories.size());
 						tfidf(tokensMap, category);
 						ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
-						Collections.reverse(sortedTfidfTokens);
-						/*//print sorted tfidf tokens and scores
-						for(int i = 0; i < sortedTfidfTokens.size(); i++) {
-							Token t = sortedTfidfTokens.get(i);
-							System.out.println(t + ": " + t.tfidf);
-						}
-						*/
+						Collections.sort(sortedTfidfTokens);
+						writeTokensToFile(sortedTfidfTokens, category);
 					}
 				}
 				break;
@@ -118,7 +111,7 @@ public class Main {
 	
 	static boolean categoryFileExists(ArrayList<File> files, String category) {
 		for(File f : files) {
-			if(f.getName().equals(category + ".json")) {
+			if(f.getName().equals(category + CATEGORY_FILE_EXTENSION)) {
 				return true;
 			}
 		}
@@ -211,10 +204,7 @@ public class Main {
 			if(token.tf > maxTF)
 				maxTF = token.tf;
 		}
-		
-		StringBuilder json = new StringBuilder();
-		json.append("{'tfidf':{'version':" + VERSION + ",'category':'" + category + "','tokens':[");
-		
+
 		//2nd pass through for augmented tfidf
 		it = tokensMap.entrySet().iterator();
 		while(it.hasNext()) {
@@ -223,35 +213,6 @@ public class Main {
 			token.tf = 0.5 + ((0.5 * token.tf) / maxTF);
 			token.idf = Math.log10((double)totalDocuments / token.documents.size());
 			token.tfidf = token.tf * token.idf;
-			
-			JsonToken jt = new JsonToken(token.id, token.tfidf);
-			Gson gson = new Gson();
-			try {
-				String jsonToken = new Gson().toJson(jt);
-				json.append(jsonToken);
-				if(it.hasNext())
-					json.append(",");
-			} catch (UnsupportedOperationException ex) {
-				try {
-					PrintWriter errors = new PrintWriter(new FileOutputStream(new File("errors.log")), true);
-					errors.println(ex.getStackTrace());
-					errors.println(ex.getMessage());
-					errors.close();
-				} catch (FileNotFoundException ex2) {
-					//i guess do nothing ??
-				}
-			}
-		}
-		json.append("]}}");
-		System.out.println(json.toString());
-		JsonParser parser = new JsonParser();
-		JsonObject jObject = (JsonObject)parser.parse(json.toString());
-		
-		try {
-			PrintWriter writer = new PrintWriter(category + ".json");
-			writer.write(jObject.toString());
-		} catch (FileNotFoundException ex) {
-			//do nothing?
 		}
 	}
 	
@@ -380,6 +341,26 @@ public class Main {
 		}
 		long finish = System.currentTimeMillis();
 		System.out.println("elapsed " + (finish - start) + " ms");
+	}
+	
+	/**
+	 * Prints a categorical token tfidf score to TSV format
+	 * @param sortedTfidfTokens a descending sorted list of tokens
+	 * @param category the category of business
+	 */
+	static void writeTokensToFile(ArrayList<Token> sortedTfidfTokens, String category) {
+		try {
+			PrintWriter tsv = new PrintWriter(category + CATEGORY_FILE_EXTENSION);	
+			for(int i = 0; i < sortedTfidfTokens.size(); i++) {
+				Token token = sortedTfidfTokens.get(i);
+				tsv.println(token.id + "\t" + token.tfidf);
+			}
+			tsv.close();
+		} catch (FileNotFoundException ex) {
+			System.out.println("caught file not found exception in print tfidf method");
+			System.exit(0);
+		}
+		
 	}
 	
 	/**

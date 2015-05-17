@@ -77,6 +77,8 @@ public class Main {
 	private static Set<String> stopwords = new HashSet<String>();
 	
 	public static void main(String[] args) {
+		
+		//Args.setArgs(args);
 
 		loadStopWords("stopwords-long");
 		ArrayList<String> categories = getDistinctLocationCategories();
@@ -189,6 +191,30 @@ public class Main {
 			totalDocuments = reviewIds.size();
 			System.out.println(category + " : " + totalDocuments);
 		}
+	}
+	
+	/**
+	 * Checks for words that include more than 1 hyphen
+	 * @param wordOrLemma
+	 * @return
+	 */
+	static boolean isHyphenatedSeries(String wordOrLemma) {
+		if(wordOrLemma.split("-").length > 1)
+			return true;
+		else
+			return false;
+	}
+	
+	/**
+	 * Checks if a token is a web address
+	 * @param wordOrLemma
+	 * @return
+	 */
+	static boolean isURL(String wordOrLemma) {
+		if(wordOrLemma.indexOf("http://") == -1 && wordOrLemma.indexOf("https://") == -1)
+			return false;
+		else
+			return true;
 	}
 	
 	/**
@@ -369,7 +395,7 @@ public class Main {
 						String word = tokenIndex.get("word").getAsString();
 						
 						//increment non stop word tokens
-						if(!isStopWord(lemma) && !isPunctuationOrDigit(lemma) && !isNumeric(lemma)) {
+						if(!isStopWord(lemma) && !isPunctuationOrDigit(lemma) && !isNumeric(lemma) && !isURL(lemma) && !isHyphenatedSeries(lemma)) {
 							String token_id = lemma + ":;:" + pos;
 							Token t = tokensMap.get(token_id);
 							if(null == t) {

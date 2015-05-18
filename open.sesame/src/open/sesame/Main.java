@@ -79,7 +79,7 @@ public class Main {
 	public static void main(String[] args) {
 		try {
 			Args.setArgs(args);
-		} catch (Exception ex) {
+		} catch (UnsupportedOperationException ex) {
 			Args.printInstructions();
 			System.exit(0);
 		}
@@ -94,30 +94,53 @@ public class Main {
 			printReviewCountsByCategory();
 		} else if(Args.tfidf) {
 			currentCategory = 0;
-			for(String category : categories) {
-				currentCategory++;
-				if(false == categoryFileExists(filesInWorkingDirectory, category)) {
-					tokensMap = new HashMap<>();
-					documentsMap = new HashMap<>();
-					ArrayList<String> businessIds = getBusinessIdList(category);
-					ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
-					totalDocuments = reviewIds.size();
-					processTokens(reviewIds, category, currentCategory, categories.size());
-					tfidf(tokensMap, category);
-					ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
-					Collections.sort(sortedTfidfTokens);
-					writeTokensToFile(sortedTfidfTokens, category);
+			if(Args.singleCategory) {
+				String category = Args.category;
+				tokensMap = new HashMap<>();
+				documentsMap = new HashMap<>();
+				ArrayList<String> businessIds = getBusinessIdList(category);
+				ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
+				totalDocuments = reviewIds.size();
+				processTokens(reviewIds, category, currentCategory, categories.size());
+				tfidf(tokensMap, category);
+				ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
+				Collections.sort(sortedTfidfTokens);
+				writeTokensToFile(sortedTfidfTokens, category);
+			} else {
+				for(String category : categories) {
+					currentCategory++;
+					if(false == categoryFileExists(filesInWorkingDirectory, category)) {
+						tokensMap = new HashMap<>();
+						documentsMap = new HashMap<>();
+						ArrayList<String> businessIds = getBusinessIdList(category);
+						ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
+						totalDocuments = reviewIds.size();
+						processTokens(reviewIds, category, currentCategory, categories.size());
+						tfidf(tokensMap, category);
+						ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
+						Collections.sort(sortedTfidfTokens);
+						writeTokensToFile(sortedTfidfTokens, category);
+					}
 				}
 			}
 		} else if(Args.lda) {
 			int K = Args.K;
 			double threshold = Args.threshold;
 			currentCategory = 0;
-			for(String category : categories) {
+			if(Args.singleCategory) {
+				String category = Args.category;
 				if(true == categoryFileExists(filesInWorkingDirectory, category)) {
 					currentCategory++;
 					documentsMap = loadDocumentsMapFromFile(category + CATEGORY_FILE_EXTENSION, threshold);
 					lda(documentsMap, K);
+				}
+			} else {
+				for(String category : categories) {
+					if(true == categoryFileExists(filesInWorkingDirectory, category)) {
+						currentCategory++;
+						documentsMap = loadDocumentsMapFromFile(category + CATEGORY_FILE_EXTENSION, threshold);
+						lda(documentsMap, K);
+					}
 				}
 			}
 		}

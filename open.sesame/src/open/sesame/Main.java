@@ -168,10 +168,10 @@ public class Main {
 		    while ((line = br.readLine()) != null) {
 		    	String[] stuff = line.split("\t");
 		    	double score = Double.parseDouble(stuff[1]);
-		    	if(score >= maxTFIDF) {
+		    	if(score > maxTFIDF) {
 		    		maxTFIDF = score;
 		    	}
-		    	if(score <= minTFIDF) {
+		    	if(score < minTFIDF) {
 		    		minTFIDF = score;
 		    	}
 		    	avgTFIDF += score;
@@ -182,28 +182,31 @@ public class Main {
 		    if(Args.auto) {
 			    //user set tmax
 			    if(Args.tmax != -1000.0) {
-			    	Args.tmax = Args.tmax * maxTFIDF;
+			    	Args.tmax = Args.tmax * maxTFIDF; //like 95% of max
 			    } else { //tmax is max
-			    	Args.tmax = maxTFIDF;
+			    	Args.tmax = maxTFIDF; //just max
 			    }
 			    //user set tmin
 			    if(Args.tmin != 1000.0) {
-				    Args.tmin = Args.tmin * minTFIDF;
+				    Args.tmin = Args.tmin * avgTFIDF; //like 50% of avg
 			    }
 		    } else {
 		    	Args.tmax = maxTFIDF;
+		    	//Args.tmin is still just Args.tmin
 		    }
 		    
 		    //go through the file one more time and calculate LDA with threshold
 		    fis = new FileInputStream(fileName);
 		    isr = new InputStreamReader(fis, Charset.forName("UTF-8"));
 		    br = new BufferedReader(isr);	    
+		    PrintWriter out = new PrintWriter("LDA-" + fileName);
 		    while ((line = br.readLine()) != null) {
 		    	String[] stuff = line.split("\t");
 		    	String token_id = stuff[0];
 		    	double score = Double.parseDouble(stuff[1]);
 		    	boolean scoreIsInRange = false;
 		    	if(score <= Args.tmax && score >= Args.tmin) { //score is between max and min
+		    		out.println(token_id + "\t" + score);
 			    	String[] review_ids = stuff[2].split(",");
 			    	for(int i = 0; i < review_ids.length; i++) {
 			    		String review_id = review_ids[i];
@@ -218,6 +221,7 @@ public class Main {
 			    	}
 		    	}
 		    }
+		    out.close();
 		    br.close();
 		    return tempMap;
 		} catch (IOException ex) {

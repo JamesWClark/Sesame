@@ -61,7 +61,7 @@ public class Main {
 	private static final MongoDatabase db = mongo.getDatabase("yelp");
 	private static final MongoCollection<Document> locations = db.getCollection("locations");
 	private static final MongoCollection<Document> reviews = db.getCollection("reviews");
-	private static final MongoCollection<Document> corenlp = db.getCollection("corenlp");
+	private static final MongoCollection<Document> corenlp = db.getCollection("corenlpbackup");
 	
 	//for tfidf
 	private static Map<String, Token> tokensMap = new HashMap<>();
@@ -86,8 +86,8 @@ public class Main {
 //				
 //				break;
 			case "tsvread":
-				String filepath = "D:\\Yelp-Dataset\\Sesame Out\\Accountants.tsv";
-				ldaFromTsv(filepath, 10, 0.65);
+				String filepath = "D:\\Yelp-Dataset\\Sesame Out\\Active Life.tsv";
+				ldaFromTsv(filepath, 8, 1.6);
 				break;
 			case "tfidf":
 				loadStopWords("stopwords-long");
@@ -95,7 +95,7 @@ public class Main {
 				Collections.sort(categories);
 				int currentCategory = 0;
 				for(String category : categories) {
-					category = "Asian Fusion";
+					category = "Gastropubs";
 					tokensMap = new HashMap<>();
 					documentsMap = new HashMap<>();
 					ArrayList<String> businessIds = getBusinessIdList(category);
@@ -114,7 +114,15 @@ public class Main {
 					*/
 					int p = 5;
 					p+=5;
-					lda(documentsMap, 12, 0.65);
+					lda(documentsMap, 8, 0.8);
+					lda(documentsMap, 6, 0.8);
+					lda(documentsMap, 4, 0.8);
+					lda(documentsMap, 8, 1.2);
+					lda(documentsMap, 6, 1.2);
+					lda(documentsMap, 4, 1.2);
+					lda(documentsMap, 8, 1.6);
+					lda(documentsMap, 6, 1.6);
+					lda(documentsMap, 4, 1.6);
 
 					
 				}
@@ -282,13 +290,11 @@ public class Main {
 		Corpus corpus = new Corpus();
 		TSVReader tsvReader = new TSVReader(filepath);
 		ArrayList<String> document = new ArrayList<String>();
-		HashMap<String, ReviewWithTokens> reviewsWithTokens = tsvReader.getReviewsWithTokens();
+		HashMap<String, ReviewWithTokens> reviewsWithTokens = tsvReader.getReviewsWithTokens(tfidfThreshold);
 		for (String review_id: reviewsWithTokens.keySet()) {
 			ArrayList<JsonToken> tokens = reviewsWithTokens.get(review_id).getTokens();
-			for (JsonToken token: tokens) {
-				if (token.getTfidf() > tfidfThreshold) {
-					document.add(token.getId());
-				}
+			for (JsonToken token: tokens) {			
+				document.add(token.getId());
 			}
 			if(document.size() > 0)
 				corpus.addDocument(document);
@@ -297,6 +303,7 @@ public class Main {
 		ldaGibbsSampler.gibbs(K);
 		double[][] phi = ldaGibbsSampler.getPhi();
 		Map<String, Double>[] topicMap = LdaUtil.translate(phi, corpus.getVocabulary(), K);
+		LdaUtil.explain(topicMap);
 		LdaUtil.explain(topicMap);
 	}
 	
@@ -357,13 +364,18 @@ public class Main {
 				
 				//foreach token
 				for(int k = 0; k < token.size(); k++) {
+//					boolean wordHasn = false;
 					//this UnsupportedOperationException was first thrown in "Asian Fusion" category
 					try {
 						JsonObject tokenIndex = token.get(k).getAsJsonObject();
 						String pos = tokenIndex.get("POS").getAsString();
 						String lemma = tokenIndex.get("lemma").getAsString().toLowerCase();
 						String word = tokenIndex.get("word").getAsString();
-						
+//						if (word.contains("\\")) {
+//							System.out.println(tokens.toString());
+//							System.out.println(word);
+//							wordHasn = true;
+//						}
 						//increment non stop word tokens
 						if(!isStopWord(lemma) && !isPunctuationOrDigit(lemma) && !isNumeric(lemma)) {
 							String token_id = lemma + ":;:" + pos;
@@ -375,6 +387,9 @@ public class Main {
 							t.count++;
 							tokensMap.put(token_id, t);
 							review.tokenIds.add(token_id);
+//							if (wordHasn) {
+//								System.out.println(token_id + "\n");
+//							}
 							totalTokens++;
 						}
 					} catch (UnsupportedOperationException ex) {

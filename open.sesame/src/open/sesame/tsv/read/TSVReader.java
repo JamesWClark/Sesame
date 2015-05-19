@@ -15,7 +15,7 @@ public class TSVReader {
 		this.filepath = filepath;
 	}
 	
-	public HashMap<String, ReviewWithTokens> getReviewsWithTokens() {
+	public HashMap<String, ReviewWithTokens> getReviewsWithTokens(double tfidfThreshold) {
 		BufferedReader tsvFile;
 		HashMap<String, ReviewWithTokens> documentMap = new HashMap<String, ReviewWithTokens>();
 		try {
@@ -27,7 +27,11 @@ public class TSVReader {
 				if (!documentMap.containsKey(review_id)) {
 					documentMap.put(dataArray[2], new ReviewWithTokens(review_id));
 				}
-				documentMap.get(review_id).getTokens().add(new JsonToken(dataArray[0], Double.parseDouble(dataArray[1])));
+				double tfidf = Double.parseDouble(dataArray[1]);
+				if (tfidf > tfidfThreshold) {
+					documentMap.get(review_id).getTokens().add(new JsonToken(dataArray[0], tfidf));
+				}
+				
 				line = tsvFile.readLine(); // Read next line of data.
 				}
 			tsvFile.close();

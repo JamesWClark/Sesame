@@ -125,20 +125,20 @@ public class Main {
 			}
 		} else if(Args.lda) {
 			int K = Args.K;
-			double threshold = Args.threshold;
+
 			currentCategory = 0;
 			if(Args.singleCategory) {
 				String category = Args.category;
 				if(true == categoryFileExists(filesInWorkingDirectory, category)) {
 					currentCategory++;
-					documentsMap = loadDocumentsMapFromFile(category + CATEGORY_FILE_EXTENSION, threshold);
+					documentsMap = loadDocumentsMapFromFile(category + CATEGORY_FILE_EXTENSION);
 					lda(documentsMap, K);
 				}
 			} else {
 				for(String category : categories) {
 					if(true == categoryFileExists(filesInWorkingDirectory, category)) {
 						currentCategory++;
-						documentsMap = loadDocumentsMapFromFile(category + CATEGORY_FILE_EXTENSION, threshold);
+						documentsMap = loadDocumentsMapFromFile(category + CATEGORY_FILE_EXTENSION);
 						lda(documentsMap, K);
 					}
 				}
@@ -148,23 +148,62 @@ public class Main {
 	}
 	
 	/**
-	 * Loads a TSV file into documentsMap - accounts for threshold
+	 * Loads a TSV file into documentsMap - accounts for max and/or min threshold
 	 * @param fileName
 	 * @param threshold
 	 * @return
 	 */
-	static Map<String, Review> loadDocumentsMapFromFile(String fileName, double threshold) {
+	static Map<String, Review> loadDocumentsMapFromFile(String fileName) {
 		Map<String, Review> tempMap = new HashMap<>();
 		try {
+			//get max and min in tfidf
 			String line;
 		    InputStream fis = new FileInputStream(fileName);
 		    InputStreamReader isr = new InputStreamReader(fis, Charset.forName("UTF-8"));
 		    BufferedReader br = new BufferedReader(isr);
+		    double minTFIDF = 1000.0;
+		    double maxTFIDF = -1000.0;
+		    double avgTFIDF = 0;
+		    int countLines = 0;
+		    while ((line = br.readLine()) != null) {
+		    	String[] stuff = line.split("\t");
+		    	double score = Double.parseDouble(stuff[1]);
+		    	if(score >= maxTFIDF) {
+		    		maxTFIDF = score;
+		    	}
+		    	if(score <= minTFIDF) {
+		    		minTFIDF = score;
+		    	}
+		    	avgTFIDF += score;
+		    	countLines++;
+		    }
+		    avgTFIDF = avgTFIDF / countLines;
+		    
+		    if(Args.auto) {
+			    //user set tmax
+			    if(Args.tmax != -1000.0) {
+			    	Args.tmax = Args.tmax * maxTFIDF;
+			    } else { //tmax is max
+			    	Args.tmax = maxTFIDF;
+			    }
+			    //user set tmin
+			    if(Args.tmin != 1000.0) {
+				    Args.tmin = Args.tmin * minTFIDF;
+			    }
+		    } else {
+		    	Args.tmax = maxTFIDF;
+		    }
+		    
+		    //go through the file one more time and calculate LDA with threshold
+		    fis = new FileInputStream(fileName);
+		    isr = new InputStreamReader(fis, Charset.forName("UTF-8"));
+		    br = new BufferedReader(isr);	    
 		    while ((line = br.readLine()) != null) {
 		    	String[] stuff = line.split("\t");
 		    	String token_id = stuff[0];
 		    	double score = Double.parseDouble(stuff[1]);
-		    	if(score >= threshold) {
+		    	boolean scoreIsInRange = false;
+		    	if(score <= Args.tmax && score >= Args.tmin) { //score is between max and min
 			    	String[] review_ids = stuff[2].split(",");
 			    	for(int i = 0; i < review_ids.length; i++) {
 			    		String review_id = review_ids[i];
@@ -179,6 +218,7 @@ public class Main {
 			    	}
 		    	}
 		    }
+		    br.close();
 		    return tempMap;
 		} catch (IOException ex) {
 			return null;

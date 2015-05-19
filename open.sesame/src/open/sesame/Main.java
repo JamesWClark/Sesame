@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -99,14 +100,22 @@ public class Main {
 				tokensMap = new HashMap<>();
 				documentsMap = new HashMap<>();
 				ArrayList<String> businessIds = getBusinessIdList(category);
-				ArrayList<String> reviewIds = getBusinessReviewIdList(businessIds);
+				ArrayList<String> reviewIds;
+				
+				if(Args.positivity) {
+					reviewIds = getPositiveBusinessReviewIdList(businessIds);
+				} else if(Args.negativity) {
+					reviewIds = getNegativeBusinessReviewIdList(businessIds);
+				} else {
+					reviewIds = getBusinessReviewIdList(businessIds);
+				}
 				totalDocuments = reviewIds.size();
 				processTokens(reviewIds, category, currentCategory, categories.size());
 				tfidf(tokensMap, category);
 				ArrayList<Token> sortedTfidfTokens = new ArrayList<Token>(tokensMap.values());
 				Collections.sort(sortedTfidfTokens);
 				writeTokensToFile(sortedTfidfTokens, category);
-			} else {
+			} else { // batch processing - has dust
 				for(String category : categories) {
 					currentCategory++;
 					if(false == categoryFileExists(filesInWorkingDirectory, category)) {
@@ -134,7 +143,7 @@ public class Main {
 					documentsMap = loadDocumentsMapFromFile(category + CATEGORY_FILE_EXTENSION);
 					lda(documentsMap, K);
 				}
-			} else {
+			} else { /* batch processing - has dust */
 				for(String category : categories) {
 					if(true == categoryFileExists(filesInWorkingDirectory, category)) {
 						currentCategory++;
@@ -611,6 +620,36 @@ public class Main {
 		}
 		long finish = System.currentTimeMillis();
 		//System.out.println("elapsed " + (finish - start) + " ms, count " + list.size());
+		return list;
+	}
+	
+	static ArrayList<String> getNegativeBusinessReviewIdList(ArrayList<String> businessIdList) {		
+		//thx mkyong - http://www.mkyong.com/mongodb/java-mongodb-query-document/
+		BasicDBObject andQuery = new BasicDBObject();
+		List<BasicDBObject> obj = new ArrayList<BasicDBObject>();
+		obj.add(new BasicDBObject("business_id", new BasicDBObject("$in", businessIdList)));
+		obj.add(new BasicDBObject("stars", new BasicDBObject("$lt", 3)));
+		andQuery.put("$and", obj);
+		MongoCursor<Document> cursor = reviews.find(andQuery).iterator();
+		ArrayList<String> list = new ArrayList<String>();
+		while(cursor.hasNext()) {
+			list.add(cursor.next().getString("review_id"));
+		}
+		return list;
+	}
+	
+	static ArrayList<String> getPositiveBusinessReviewIdList(ArrayList<String> businessIdList) {		
+		//thx mkyong - http://www.mkyong.com/mongodb/java-mongodb-query-document/
+		BasicDBObject andQuery = new BasicDBObject();
+		List<BasicDBObject> obj = new ArrayList<BasicDBObject>();
+		obj.add(new BasicDBObject("business_id", new BasicDBObject("$in", businessIdList)));
+		obj.add(new BasicDBObject("stars", new BasicDBObject("$gt", 3)));
+		andQuery.put("$and", obj);
+		MongoCursor<Document> cursor = reviews.find(andQuery).iterator();
+		ArrayList<String> list = new ArrayList<String>();
+		while(cursor.hasNext()) {
+			list.add(cursor.next().getString("review_id"));
+		}
 		return list;
 	}
 }

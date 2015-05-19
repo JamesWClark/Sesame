@@ -7,13 +7,38 @@ public class Args {
 	public static boolean lda = false;
 	public static boolean countCategories = false;
 	public static boolean singleCategory = false;
+	public static boolean positivity = false;
+	public static boolean negativity = false;
 	public static int K = -1;
 	public static double tmin = 1000.0;
 	public static double tmax = -1000.0;
-	public static String category = "";
+	public static String category = ""; //yelp, corenlp, inclusive, exclusive
+	public static String sentimentCollection = "";
+	
+	/** THE BELOW COMMENTS NEVER GOT IMPLEMENTED **/
+	
+	// positive: sentimentCollection
+	// yelp = stars > 3
+	// corenlp = sa > neutral
+	// inclusive = stars > 3 && sa > neutral
+	// exclusive = stars > 3 || sa > neutral
+
+	// negative: sentimentCollection
+	// yelp = stars < 3
+	// corenlp = sa < neutral
+	// inclusive = stars < 3 && sa < neutral
+	// exclusive = stars < 3 || sa < neutral	
 	
 	public static void setArgs(String[] args) {
 		for(int i = 0; i < args.length; i++) {
+			if(args[i].toLowerCase().equals("-positivity")) { //goes with tfidf
+				positivity = true;
+				//sentimentCollection = args[i + 1];
+			}
+			if(args[i].toLowerCase().equals("-negativity")) { //goes with tfidf
+				negativity = true;
+				//sentimentCollection = args[i + 1];
+			}
 			if(args[i].equals("-auto")) {
 				auto = true;
 			}
